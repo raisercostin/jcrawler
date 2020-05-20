@@ -12,17 +12,8 @@ import io.vavr.collection.Seq;
 import io.vavr.collection.Set;
 import io.vavr.collection.Traversable;
 import io.vavr.control.Option;
-import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
-import lombok.ToString;
-import lombok.Value;
 import lombok.val;
-import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringUtils;
 import org.raisercostin.jedio.DirLocation;
 import org.raisercostin.jedio.FileLocation;
 import org.raisercostin.jedio.Locations;
@@ -65,40 +56,6 @@ public class JCrawler {
 
   private static Traversable<HyperLink> toLinks(List<HttpClientLocation> files) {
     return files.map(url -> HyperLink.of(url.toExternalForm(), "original", "", null, null));
-  }
-
-  @Value
-  @NoArgsConstructor(access = AccessLevel.PRIVATE, force = true)
-  @AllArgsConstructor
-  @Getter(lombok.AccessLevel.NONE)
-  @Setter(lombok.AccessLevel.NONE)
-  @FieldDefaults(makeFinal = true, level = AccessLevel.PUBLIC)
-  @Slf4j
-  public static class HyperLink {
-    public static HyperLink of(String relativeOrAbsoluteHyperlink, String text, String all, String sourceHyperlink,
-        String sourceLocal) {
-      HttpClientLocation link = Locations.url(sourceHyperlink, relativeOrAbsoluteHyperlink);
-      //TODO link should not contain #fragments since link is used for uniqueness
-      return new HyperLink(link.toExternalForm(), relativeOrAbsoluteHyperlink, text, all, sourceHyperlink, sourceLocal);
-    }
-
-    String link;
-    String relativeOrAbsoluteHyperlink;
-    @ToString.Exclude
-    String text;
-    @ToString.Exclude
-    String all;
-    String sourceHyperlink;
-    String sourceLocal;
-
-    @ToString.Include
-    String text() {
-      return StringUtils.abbreviate(text, 100).replaceAll("\\s+", " ");
-    }
-
-    public HttpClientLocation link() {
-      return Locations.url(link);
-    }
   }
 
   private static Traversable<HyperLink> downloadAndExtractLinks(HyperLink hyperLink,
