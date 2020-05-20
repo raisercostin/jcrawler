@@ -88,9 +88,11 @@
       <groupId>org.raisercostin</groupId>
       <artifactId>jedio</artifactId>
     </dependency>
- -->    <dependency>
+ -->
+    <dependency>
       <groupId>org.raisercostin</groupId>
       <artifactId>jedi-nodes-java</artifactId>
+      <version>0.7</version>
     </dependency>
     <dependency>
       <groupId>io.projectreactor</groupId>
