@@ -12,7 +12,14 @@ import io.vavr.collection.Seq;
 import io.vavr.collection.Set;
 import io.vavr.collection.Traversable;
 import io.vavr.control.Option;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.Value;
 import lombok.val;
+import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.raisercostin.jedio.DirLocation;
 import org.raisercostin.jedio.FileLocation;
@@ -29,12 +36,29 @@ import org.raisercostin.util.Escape;
 
 @Slf4j
 public class JCrawler {
+  @Value
+  @NoArgsConstructor(access = AccessLevel.PRIVATE, force = true)
+  @AllArgsConstructor
+  @Getter(lombok.AccessLevel.NONE)
+  @Setter(lombok.AccessLevel.NONE)
+  @FieldDefaults(makeFinal = true, level = AccessLevel.PUBLIC)
+  @Slf4j
+  public static class CrawlConfig {
+    public static CrawlConfig of(WebLocation webLocation) {
+      return new CrawlConfig(webLocation, webLocation.ls().map(x -> x.asHttpClientLocation().toExternalForm()).toSet());
+    }
+
+    WebLocation webLocation;
+    Set<String> children;
+  }
+
   public static void crawl(WebLocation webLocation, DirLocation<?> destination) {
+    CrawlConfig config = CrawlConfig.of(webLocation);
     log.info("crawling [{}] to {}", webLocation, destination);
     List<HttpClientLocation> files = webLocation.ls().map(x -> x.asHttpClientLocation()).toList();
     files.forEach(System.out::println);
     Set<String> visited = API.Set();
-    crawl(visited, toLinks(files), destination);
+    crawl(config, visited, toLinks(files), destination);
     //    files.forEach(
     //      file -> extractLinks(file.copyTo(destination.child(slug(file)).asWritableFile(),
     //        CopyOptions.copyDoNotOverwrite().withDefaultReporting())));
@@ -42,11 +66,16 @@ public class JCrawler {
 
   //TODO - breadth first
   //depth first
-  private static Set<String> crawl(Set<String> visited2, Traversable<HyperLink> todo, DirLocation<?> destination) {
+  private static Set<String> crawl(CrawlConfig config, Set<String> visited2, Traversable<HyperLink> todo,
+      DirLocation<?> destination) {
     return todo.foldLeft(visited2, (visited, link) -> {
       ReferenceLocation href = link.link();
       if (!visited.contains(href.toExternalForm())) {
-        return crawl(visited.add(href.toExternalForm()), downloadAndExtractLinks(link, destination), destination);
+        return crawl(
+          config,
+          visited.add(href.toExternalForm()),
+          downloadAndExtractLinks(config, link, destination),
+          destination);
       } else {
         log.info("already visited {}", link);
         return visited;
@@ -58,11 +87,21 @@ public class JCrawler {
     return files.map(url -> HyperLink.of(url.toExternalForm(), "original", "", null, null));
   }
 
-  private static Traversable<HyperLink> downloadAndExtractLinks(HyperLink hyperLink,
+  private static Traversable<HyperLink> downloadAndExtractLinks(CrawlConfig config, HyperLink hyperLink,
       DirLocation<?> destination) {
     HttpClientLocation link = hyperLink.link();
-    return extractLinks(link.copyTo(destination.child(slug(link)).asWritableFile(),
-      CopyOptions.copyDoNotOverwrite().withDefaultReporting()));
+    if (accept(config, link)) {
+      return extractLinks(link.copyTo(destination.child(slug(link)).asWritableFile(),
+        CopyOptions.copyDoNotOverwrite().withDefaultReporting()));
+    } else {
+      log.info("following {} is not allowed", hyperLink);
+      return Iterator.empty();
+    }
+  }
+
+  private static boolean accept(CrawlConfig config, HttpClientLocation link) {
+    String url = link.toExternalForm();
+    return config.children.exists(x -> url.startsWith(x));
   }
 
   //val notParsedUrls = Seq("javascript", "tel")
