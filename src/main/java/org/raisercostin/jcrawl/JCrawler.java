@@ -8,6 +8,7 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
 import io.vavr.API;
 import io.vavr.collection.Iterator;
 import io.vavr.collection.List;
+import io.vavr.collection.Seq;
 import io.vavr.collection.Set;
 import io.vavr.collection.Traversable;
 import io.vavr.control.Option;
@@ -56,7 +57,7 @@ public class JCrawler {
       if (!visited.contains(href.toExternalForm())) {
         return crawl(visited.add(href.toExternalForm()), downloadAndExtractLinks(link, destination), destination);
       } else {
-        log.info("already touched {}", link);
+        log.info("already visited {}", link);
         return visited;
       }
     });
@@ -76,9 +77,8 @@ public class JCrawler {
   public static class HyperLink {
     public static HyperLink of(String relativeOrAbsoluteHyperlink, String text, String all, String sourceHyperlink,
         String sourceLocal) {
-      HttpClientLocation link = sourceHyperlink != null
-          ? Locations.url(sourceHyperlink).child(relativeOrAbsoluteHyperlink)
-          : Locations.url(relativeOrAbsoluteHyperlink);
+      HttpClientLocation link = Locations.url(sourceHyperlink, relativeOrAbsoluteHyperlink);
+      //TODO link should not contain #fragments since link is used for uniqueness
       return new HyperLink(link.toExternalForm(), relativeOrAbsoluteHyperlink, text, all, sourceHyperlink, sourceLocal);
     }
 
@@ -100,15 +100,6 @@ public class JCrawler {
       return Locations.url(link);
     }
   }
-
-  private static Pattern exp(String sep) {
-    return Pattern.compile("(?i)(?s)<a[^>]*\\s+href=" + sep + "([^" + sep + "]*)" + sep + "[^>]*>(.*?)</a>");
-    //regular expressions with named group consumes 17% of all time
-    //("href", "text")
-  }
-
-  private final static Pattern r1 = exp("'");
-  private final static Pattern r2 = exp("\\\"");
 
   private static Traversable<HyperLink> downloadAndExtractLinks(HyperLink hyperLink,
       DirLocation<?> destination) {
@@ -151,12 +142,19 @@ public class JCrawler {
     }
   }
 
+  private static Pattern exp(String sep) {
+    return Pattern.compile("(?i)(?s)<a[^>]*\\s+href=" + sep + "([^" + sep + "]*)" + sep + "[^>]*>(.*?)</a>");
+    //regular expressions with named group consumes 17% of all time
+    //("href", "text")
+  }
+
+  private final static Seq<Pattern> allExp = API.Seq(exp("'"), exp("\\\""));
+
   private static Iterator<HyperLink> extractLinks(WritableFileLocation source, MetaInfo meta) {
     Iterator<HyperLink> result;
     String sourceUrl = meta.httpMetaRequestUri().get();
     val content = source.asReadableFile().readContent();
-    val allExp = Iterator.of(r1, r2);
-    result = allExp.flatMap(exp -> {
+    result = allExp.iterator().flatMap(exp -> {
       Iterator<Matcher> all = Iterator.continually(exp.matcher(content)).takeWhile(matcher -> matcher.find());
       return all.map(
         m -> HyperLink.of(m.group(1).trim(), m.group(2).trim(), m.group().trim(), sourceUrl, source.toExternalForm()));
