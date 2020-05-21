@@ -3,6 +3,10 @@ package org.raisercostin.jcrawl;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.ObjectIdGenerators;
+import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
 import io.vavr.API;
@@ -36,6 +40,30 @@ import org.raisercostin.util.Escape;
 
 @Slf4j
 public class JCrawler {
+
+  public static class ThrowablesModule extends SimpleModule {
+    private static final long serialVersionUID = -2687534903247863765L;
+
+    @JsonIgnoreProperties({ "$id" })
+    public abstract class ThrowableMixIn {
+      @JsonIdentityInfo(generator = ObjectIdGenerators.StringIdGenerator.class, property = "$id")
+      private Throwable cause;
+    }
+
+    public ThrowablesModule() {
+      super("throwables");
+    }
+
+    @Override
+    public void setupModule(SetupContext context) {
+      context.setMixInAnnotations(Throwable.class, ThrowableMixIn.class);
+    }
+  }
+
+  static {
+    Nodes.json.mapper.registerModule(new ThrowablesModule());
+  }
+
   @Value
   @NoArgsConstructor(access = AccessLevel.PRIVATE, force = true)
   @AllArgsConstructor
@@ -118,7 +146,7 @@ public class JCrawler {
       log.info("searching links in [{}] from {}", contentType, source);
       Iterator<HyperLink> result = isHtmlAnd200 ? extractLinks(source, meta) : Iterator.empty();
       List<HyperLink> all = result.toList();
-      if (meta.httpMetaResponseStatusCode().get().equals("301")) {
+      if (meta.httpMetaResponseStatusCode().getOrElse("").equals("301")) {
         String sourceUrl = meta.httpMetaRequestUri().get();
         all = all
           .append(
