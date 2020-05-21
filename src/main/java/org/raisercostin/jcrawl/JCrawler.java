@@ -118,7 +118,7 @@ public class JCrawler {
       log.info("searching links in [{}] from {}", contentType, source);
       Iterator<HyperLink> result = isHtmlAnd200 ? extractLinks(source, meta) : Iterator.empty();
       List<HyperLink> all = result.toList();
-      if (meta.httpMetaResponseStatusCode().getOrElse("").equals("301")) {
+      if (meta.httpMetaResponseStatusCode().getOrElse("").equals("302")) {
         String sourceUrl = meta.httpMetaRequestUri().get();
         all = all
           .append(
