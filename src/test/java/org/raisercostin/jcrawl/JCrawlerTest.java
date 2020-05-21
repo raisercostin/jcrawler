@@ -11,8 +11,14 @@ class JCrawlerTest {
   }
 
   @Test
-  void testRevomaticoStatic() {
+  void testRevomatico() {
     JCrawler.crawl(Locations.web("revomatico.com"),
-      Locations.dir("d:\\home\\raiser\\work\\_var_namek_jcrawl\\scan1").mkdirIfNecessary());
+      Locations.dir("d:\\home\\raiser\\work\\_var_namek_jcrawl\\scan1-revomatico").mkdirIfNecessary());
   }
+  //
+  //  @Test
+  //  void testRoweb() {
+  //    JCrawler.crawl(Locations.web("roweb.ro"),
+  //      Locations.dir("d:\\home\\raiser\\work\\_var_namek_jcrawl\\scan2-roweb").mkdirIfNecessary());
+  //  }
 }
