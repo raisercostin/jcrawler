@@ -91,8 +91,13 @@ public class JCrawler {
       DirLocation<?> destination) {
     HttpClientLocation link = hyperLink.link();
     if (accept(config, link)) {
-      return extractLinks(link.copyTo(destination.child(slug(link)).asWritableFile(),
-        CopyOptions.copyDoNotOverwrite().withDefaultReporting()));
+      try {
+        return extractLinks(link.copyTo(destination.child(slug(link)).asWritableFile(),
+          CopyOptions.copyDoNotOverwrite().withDefaultReporting()));
+      } catch (Exception e) {
+        log.error("couldn't extract links from {}", hyperLink);
+        return Iterator.empty();
+      }
     } else {
       log.info("following {} is not allowed", hyperLink);
       return Iterator.empty();
@@ -118,7 +123,8 @@ public class JCrawler {
       log.info("searching links in [{}] from {}", contentType, source);
       Iterator<HyperLink> result = isHtmlAnd200 ? extractLinks(source, meta) : Iterator.empty();
       List<HyperLink> all = result.toList();
-      if (meta.httpMetaResponseStatusCode().getOrElse("").equals("302")) {
+      int status = meta.httpMetaResponseStatusCode().getOrElse(-1);
+      if (300 <= status && status < 400 && meta.httpMetaResponseHeaderLocation().isDefined()) {
         String sourceUrl = meta.httpMetaRequestUri().get();
         all = all
           .append(

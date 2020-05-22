@@ -2,11 +2,15 @@
 Crawiling in java 
 
 ## Features
-- [ ] adding meta
-  - [x] http meta
-  - [ ] hyperlinks meta file
-  - [ ] add pluggable config of meta 
 
+- [ ] scraping
+  - [ ] jsoup convert
+- [ ] crawling
+  - [ ] breadth search - now is recurisve depth search
+  - [x] adding meta
+    - [x] http meta
+    - [x] hyperlinks meta file
+    - [x] add pluggable config of meta 
 
 
 ## Competition
