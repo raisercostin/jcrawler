@@ -32,7 +32,6 @@ import org.raisercostin.jedio.WritableFileLocation;
 import org.raisercostin.jedio.op.CopyOptions;
 import org.raisercostin.jedio.url.HttpClientLocation;
 import org.raisercostin.nodes.Nodes;
-import org.raisercostin.util.Escape;
 
 @Slf4j
 public class JCrawler {
@@ -169,6 +168,6 @@ public class JCrawler {
   }
 
   private static RelativeLocation slug(String url) {
-    return Locations.relative(Escape.toSlug(url));
+    return Locations.relative(SlugEscape.toSlug(url));
   }
 }

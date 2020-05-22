@@ -3,6 +3,7 @@ package org.raisercostin.jcrawl;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.raisercostin.jedio.Locations;
+import org.raisercostin.jscraper.JScraper;
 
 class JCrawlerTest {
   @Test
@@ -20,9 +21,15 @@ class JCrawlerTest {
   }
 
   @Test
-  //@Disabled
+  @Disabled
   void testRestorcracy() {
     JCrawler.crawl(Locations.web("restocracy.ro"),
       Locations.dir("d:\\home\\raiser\\work\\_var_namek_jcrawl\\scan3-restocracy").mkdirIfNecessary());
+  }
+
+  @Test
+  //@Disabled
+  void testRestorcracyScraping() {
+    JScraper.scrape(Locations.dir("d:\\home\\raiser\\work\\_var_namek_jcrawl\\scan3-restocracy").mkdirIfNecessary());
   }
 }
