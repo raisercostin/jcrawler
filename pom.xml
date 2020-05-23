@@ -8,7 +8,7 @@
   <parent>
     <groupId>org.raisercostin</groupId>
     <artifactId>maven-defaults-raisercostin</artifactId>
-    <version>1.7</version>
+    <version>1.9</version>
   </parent>
   <artifactId>namek-jcrawl</artifactId>
   <version>0.1-SNAPSHOT</version>
@@ -161,6 +161,7 @@
 <!--     <dependency>
       <groupId>org.raisercostin</groupId>
       <artifactId>jedio</artifactId>
+      <version>0.25</version>
     </dependency>
  -->
     <dependency>
