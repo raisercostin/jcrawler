@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.raisercostin.jedio.Locations;
 import org.raisercostin.jedio.url.HttpClientLocation;
+import org.raisercostin.jedio.url.SimpleUrl;
 
 @Value
 @NoArgsConstructor(access = AccessLevel.PRIVATE, force = true)
@@ -42,7 +43,7 @@ public class HyperLink {
     return StringUtils.abbreviate(text, 100).replaceAll("\\s+", " ");
   }
 
-  public HttpClientLocation link() {
-    return Locations.url(link);
+  public SimpleUrl link(boolean keepQuery) {
+    return SimpleUrl.from(link, keepQuery);
   }
 }

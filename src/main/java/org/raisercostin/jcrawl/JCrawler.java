@@ -22,15 +22,16 @@ import lombok.val;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.raisercostin.jedio.DirLocation;
-import org.raisercostin.jedio.FileLocation;
 import org.raisercostin.jedio.Locations;
 import org.raisercostin.jedio.MetaInfo;
+import org.raisercostin.jedio.ReadableFileLocation;
 import org.raisercostin.jedio.ReferenceLocation;
 import org.raisercostin.jedio.RelativeLocation;
 import org.raisercostin.jedio.WebLocation;
 import org.raisercostin.jedio.WritableFileLocation;
 import org.raisercostin.jedio.op.CopyOptions;
 import org.raisercostin.jedio.url.HttpClientLocation;
+import org.raisercostin.jedio.url.SimpleUrl;
 import org.raisercostin.nodes.Nodes;
 
 @Slf4j
@@ -43,16 +44,29 @@ public class JCrawler {
   @FieldDefaults(makeFinal = true, level = AccessLevel.PUBLIC)
   @Slf4j
   public static class CrawlConfig {
-    public static CrawlConfig of(WebLocation webLocation) {
-      return new CrawlConfig(webLocation, webLocation.ls().map(x -> x.asHttpClientLocation().toExternalForm()).toSet());
+    public static CrawlConfig of(WebLocation webLocation, Option<ReadableFileLocation> whitelistSample) {
+      boolean includeQuery = false;
+      Option<Set<String>> whitelist = whitelistSample
+        .map(x -> extractLinksFromContent(x.readContent(), null, null)
+          .map(z -> SimpleUrl.from(z.link).withoutQuery().toExternalForm())
+          .toSet());
+      return new CrawlConfig(webLocation, webLocation.ls().map(x -> x.asHttpClientLocation().toExternalForm()).toSet(),
+        includeQuery, whitelist);
     }
 
     WebLocation webLocation;
     Set<String> children;
+    boolean includeQuery;
+    Option<Set<String>> whitelist;
+
+    public boolean acceptCrawl(SimpleUrl link) {
+      return whitelist.get().contains(link.toExternalForm());
+    }
   }
 
-  public static void crawl(WebLocation webLocation, DirLocation<?> destination) {
-    CrawlConfig config = CrawlConfig.of(webLocation);
+  public static void crawl(WebLocation webLocation, Option<ReadableFileLocation> whitelistSample,
+      DirLocation<?> destination) {
+    CrawlConfig config = CrawlConfig.of(webLocation, whitelistSample);
     log.info("crawling [{}] to {}", webLocation, destination);
     List<HttpClientLocation> files = webLocation.ls().map(x -> x.asHttpClientLocation()).toList();
     files.forEach(System.out::println);
@@ -68,15 +82,15 @@ public class JCrawler {
   private static Set<String> crawl(CrawlConfig config, Set<String> visited2, Traversable<HyperLink> todo,
       DirLocation<?> destination) {
     return todo.foldLeft(visited2, (visited, link) -> {
-      ReferenceLocation href = link.link();
-      if (!visited.contains(href.toExternalForm())) {
+      SimpleUrl href = link.link(config.includeQuery);
+      if (!visited.contains(href.toExternalForm()) && config.acceptCrawl(href)) {
         return crawl(
           config,
           visited.add(href.toExternalForm()),
           downloadAndExtractLinks(config, link, destination),
           destination);
       } else {
-        log.info("already visited {}", link);
+        log.info("already visited or ignored {}", link);
         return visited;
       }
     });
@@ -88,11 +102,12 @@ public class JCrawler {
 
   private static Traversable<HyperLink> downloadAndExtractLinks(CrawlConfig config, HyperLink hyperLink,
       DirLocation<?> destination) {
-    HttpClientLocation link = hyperLink.link();
+    SimpleUrl link = hyperLink.link(config.includeQuery);
     if (accept(config, link)) {
       try {
-        return extractLinks(link.copyTo(destination.child(slug(link)).asWritableFile(),
-          CopyOptions.copyDoNotOverwrite().withDefaultReporting()));
+        return extractLinks(Locations.url(link)
+          .copyTo(destination.child(slug(link)).asWritableFile(),
+            CopyOptions.copyDoNotOverwrite().withDefaultReporting()));
       } catch (Exception e) {
         log.error("couldn't extract links from {}", hyperLink);
         return Iterator.empty();
@@ -103,7 +118,7 @@ public class JCrawler {
     }
   }
 
-  private static boolean accept(CrawlConfig config, HttpClientLocation link) {
+  private static boolean accept(CrawlConfig config, SimpleUrl link) {
     String url = link.toExternalForm();
     return config.children.exists(x -> url.startsWith(x));
   }
@@ -155,15 +170,22 @@ public class JCrawler {
     Iterator<HyperLink> result;
     String sourceUrl = meta.httpMetaRequestUri().get();
     val content = source.asReadableFile().readContent();
+    return extractLinksFromContent(content, source.toExternalForm(), sourceUrl);
+  }
+
+  private static Iterator<HyperLink> extractLinksFromContent(final java.lang.String content,
+      String source,
+      String sourceUrl) {
+    Iterator<HyperLink> result;
     result = allExp.iterator().flatMap(exp -> {
       Iterator<Matcher> all = Iterator.continually(exp.matcher(content)).takeWhile(matcher -> matcher.find());
       return all.map(
-        m -> HyperLink.of(m.group(1).trim(), m.group(2).trim(), m.group().trim(), sourceUrl, source.toExternalForm()));
+        m -> HyperLink.of(m.group(1).trim(), m.group(2).trim(), m.group().trim(), sourceUrl, source));
     });
     return result;
   }
 
-  private static RelativeLocation slug(FileLocation file) {
+  private static RelativeLocation slug(SimpleUrl file) {
     return slug(file.toExternalForm());
   }
 

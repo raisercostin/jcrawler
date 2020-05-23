@@ -5,7 +5,9 @@ Crawiling in java
 
 - [ ] scraping
   - [ ] jsoup convert
-- [ ] crawling
+  [ ] crawling
+  - [x] option to remove query params when searching for new links
+  - [x] whitelist from other html
   - [ ] breadth search - now is recurisve depth search
   - [ ] max parallel threads
   - [ ] max calls/second
@@ -22,7 +24,6 @@ Crawiling in java
     - [x] authority: domain/subdomain
     - [ ] depth
     - [ ] content type
-    - [ ] query removal
     - [ ] protocol/schema filter
   - [x] adding meta
     - [x] http meta
