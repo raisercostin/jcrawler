@@ -11,7 +11,7 @@
     <version>1.12</version>
   </parent>
   <artifactId>namek-jcrawl</artifactId>
-  <version>0.1-SNAPSHOT</version>
+  <version>0.1</version>
   <description>Crawler.</description>
   <url>${git.url}</url>
   <scm>
