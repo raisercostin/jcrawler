@@ -91,10 +91,14 @@ public class JScraper {
 
     @SneakyThrows
     public Document normalizePage() {
-      String url = httpMeta().httpMetaRequestUri().get();
       String content = crawl.readContent();
       content = ExtractorUtils.replaceEntities(content);
+      String url = httpMeta().httpMetaRequestUri().get();
       return Jsoup.parse(content, url);
+    }
+
+    public Document jsoup() {
+      return normalizePage();
     }
 
     public String jsoupCleanDocument() {

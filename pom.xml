@@ -8,7 +8,7 @@
   <parent>
     <groupId>org.raisercostin</groupId>
     <artifactId>maven-defaults-raisercostin</artifactId>
-    <version>1.9</version>
+    <version>1.12</version>
   </parent>
   <artifactId>namek-jcrawl</artifactId>
   <version>0.1-SNAPSHOT</version>
@@ -74,8 +74,44 @@
   <dependencies>
     <dependency>
       <groupId>org.raisercostin</groupId>
+      <artifactId>jedio</artifactId>
+      <version>0.27</version>
+    </dependency>
+    <dependency>
+      <groupId>org.raisercostin</groupId>
+      <artifactId>jedi-nodes-java</artifactId>
+      <version>0.9</version>
+    </dependency>
+    <dependency>
+      <groupId>org.raisercostin</groupId>
       <artifactId>namek-server_2.11</artifactId>
       <version>0.26</version>
+      <exclusions>
+        <exclusion>
+          <groupId>com.google.appengine</groupId>
+          <artifactId>appengine-api-stubs</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.google.appengine</groupId>
+          <artifactId>appengine-api-labs</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>com.google.appengine</groupId>
+          <artifactId>appengine-api-1.0-sdk</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.raisercostin</groupId>
+          <artifactId>jedi-nodes_2.11</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.raisercostin</groupId>
+          <artifactId>jedi-io_2.11</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.raisercostin</groupId>
+          <artifactId>jedi-nodes-java</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.jsoup</groupId>
@@ -85,7 +121,6 @@
     <dependency>
       <groupId>org.ccil.cowan.tagsoup</groupId>
       <artifactId>tagsoup</artifactId>
-      <version>1.2.1</version>
     </dependency>
     <!-- 
     <dependency>
@@ -158,16 +193,9 @@
       <groupId>org.springframework</groupId>
       <artifactId>spring-core</artifactId>
     </dependency>
-<!--     <dependency>
-      <groupId>org.raisercostin</groupId>
-      <artifactId>jedio</artifactId>
-      <version>0.25</version>
-    </dependency>
- -->
     <dependency>
-      <groupId>org.raisercostin</groupId>
-      <artifactId>jedi-nodes-java</artifactId>
-      <version>0.8</version>
+      <groupId>com.fasterxml.jackson.dataformat</groupId>
+      <artifactId>jackson-dataformat-yaml</artifactId>
     </dependency>
     <dependency>
       <groupId>io.projectreactor</groupId>
@@ -262,7 +290,7 @@
     <dependency>
       <groupId>org.raisercostin</groupId>
       <artifactId>raisercostin-commons</artifactId>
-      <version>2.26</version>
+      <version>2.27</version>
     </dependency>
     <!-- logs -->
     <dependency>
