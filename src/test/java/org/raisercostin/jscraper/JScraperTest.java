@@ -49,7 +49,7 @@ class JScraperTest {
     // Result: [(-1, "Hell"), (1, "G"), (0, "o"), (1, "odbye"), (0, " World.")]
     dmp.diff_cleanupSemantic(diff);
     // Result: [(-1, "Hello"), (1, "Goodbye"), (0, " World.")]
-    Locations.writableFile("target/diff2.html").write(dmp.diff_prettyHtml(diff));
+    Locations.path("target/diff2.html").write(dmp.diff_prettyHtml(diff));
     dump(diff);
     Nodes.yml.mapper().configure(Feature.LITERAL_BLOCK_STYLE, true);
     Nodes.yml.mapper().configure(Feature.MINIMIZE_QUOTES, true);

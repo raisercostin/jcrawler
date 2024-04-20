@@ -13,6 +13,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.raisercostin.jedio.Locations;
 import org.raisercostin.jedio.url.HttpClientLocation;
 import org.raisercostin.jedio.url.SimpleUrl;
+import org.raisercostin.jedio.url.WebClientLocation;
 
 @Value
 @NoArgsConstructor(access = AccessLevel.PRIVATE, force = true)
@@ -24,7 +25,7 @@ import org.raisercostin.jedio.url.SimpleUrl;
 public class HyperLink {
   public static HyperLink of(String relativeOrAbsoluteHyperlink, String text, String all, String sourceHyperlink,
       String sourceLocal) {
-    HttpClientLocation link = Locations.url(sourceHyperlink, relativeOrAbsoluteHyperlink);
+    WebClientLocation link = Locations.url(sourceHyperlink, relativeOrAbsoluteHyperlink);
     //TODO link should not contain #fragments since link is used for uniqueness
     return new HyperLink(link.toExternalForm(), relativeOrAbsoluteHyperlink, text, all, sourceHyperlink, sourceLocal);
   }

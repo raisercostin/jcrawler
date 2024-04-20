@@ -11,14 +11,14 @@ class JCrawlerTest {
   @Disabled
   void testRevomatico() {
     JCrawler.crawl(Locations.web("revomatico.com"), Option.none(),
-      Locations.dir("d:\\home\\raiser\\work\\_var_namek_jcrawl\\scan1-revomatico").mkdirIfNecessary());
+      Locations.dir("d:\\home\\raiser\\work\\_var_namek_jcrawl\\scan1-revomatico").mkdirIfNeeded());
   }
 
   @Test
   @Disabled
   void testRoweb() {
     JCrawler.crawl(Locations.web("roweb.ro"), Option.none(),
-      Locations.dir("d:\\home\\raiser\\work\\_var_namek_jcrawl\\scan2-roweb").mkdirIfNecessary());
+      Locations.dir("d:\\home\\raiser\\work\\_var_namek_jcrawl\\scan2-roweb").mkdirIfNeeded());
   }
 
   @Test
@@ -26,12 +26,12 @@ class JCrawlerTest {
   void testRestorcracy() {
     JCrawler.crawl(Locations.web("restocracy.ro"),
       Option.of(Locations.readableFile("d:/home/raiser/work/_var_namek_jcrawl/restocracy-toate-restaurantele.html")),
-      Locations.dir("d:\\home\\raiser\\work\\_var_namek_jcrawl\\scan3-restocracy").mkdirIfNecessary());
+      Locations.dir("d:\\home\\raiser\\work\\_var_namek_jcrawl\\scan3-restocracy").mkdirIfNeeded());
   }
 
   @Test
   //@Disabled
   void testRestorcracyScraping() {
-    JScraper.scrape(Locations.dir("d:\\home\\raiser\\work\\_var_namek_jcrawl\\scan3-restocracy").mkdirIfNecessary());
+    JScraper.scrape(Locations.dir("d:\\home\\raiser\\work\\_var_namek_jcrawl\\scan3-restocracy").mkdirIfNeeded());
   }
 }

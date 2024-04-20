@@ -33,6 +33,8 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.esotericsoftware.minlog.Log;
+
 /*
  * Functions for diff, match and patch.
  * Computes the difference between two texts to create a patch.
@@ -47,6 +49,7 @@ import java.util.regex.Pattern;
  * From https://github.com/google/diff-match-patch/wiki/API
  */
 public class diff_match_patch {
+  private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(diff_match_patch.class);
 
   // Defaults.
   // Set these on your diff_match_patch instance to override the defaults.
@@ -2271,6 +2274,11 @@ public class diff_match_patch {
         try {
           sign = text.getFirst().charAt(0);
         } catch (IndexOutOfBoundsException e) {
+          if (log.isTraceEnabled()) {
+            log.trace("Blank line? Whatever: ", e);
+          } else {
+            log.debug("Blank line? Whatever {}. Enable trace for fullstacktrace.", e.getMessage());
+          }
           // Blank line?  Whatever.
           text.removeFirst();
           continue;

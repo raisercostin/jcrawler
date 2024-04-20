@@ -27,11 +27,11 @@ import org.raisercostin.jedio.MetaInfo;
 import org.raisercostin.jedio.ReadableFileLocation;
 import org.raisercostin.jedio.ReferenceLocation;
 import org.raisercostin.jedio.RelativeLocation;
-import org.raisercostin.jedio.WebLocation;
 import org.raisercostin.jedio.WritableFileLocation;
 import org.raisercostin.jedio.op.CopyOptions;
 import org.raisercostin.jedio.url.HttpClientLocation;
 import org.raisercostin.jedio.url.SimpleUrl;
+import org.raisercostin.jedio.url.WebLocation;
 import org.raisercostin.nodes.Nodes;
 
 @Slf4j
@@ -65,7 +65,7 @@ public class JCrawler {
   }
 
   public static void crawl(WebLocation webLocation, Option<ReadableFileLocation> whitelistSample,
-      DirLocation<?> destination) {
+      DirLocation destination) {
     CrawlConfig config = CrawlConfig.of(webLocation, whitelistSample);
     log.info("crawling [{}] to {}", webLocation, destination);
     List<HttpClientLocation> files = webLocation.ls().map(x -> x.asHttpClientLocation()).toList();
@@ -80,7 +80,7 @@ public class JCrawler {
   //TODO - breadth first
   //depth first
   private static Set<String> crawl(CrawlConfig config, Set<String> visited2, Traversable<HyperLink> todo,
-      DirLocation<?> destination) {
+      DirLocation destination) {
     return todo.foldLeft(visited2, (visited, link) -> {
       SimpleUrl href = link.link(config.includeQuery);
       if (!visited.contains(href.toExternalForm()) && config.acceptCrawl(href)) {
@@ -101,15 +101,15 @@ public class JCrawler {
   }
 
   private static Traversable<HyperLink> downloadAndExtractLinks(CrawlConfig config, HyperLink hyperLink,
-      DirLocation<?> destination) {
+      DirLocation destination) {
     SimpleUrl link = hyperLink.link(config.includeQuery);
     if (accept(config, link)) {
       try {
         return extractLinks(Locations.url(link)
-          .copyTo(destination.child(slug(link)).asWritableFile(),
-            CopyOptions.copyDoNotOverwrite().withDefaultReporting()));
+          .copyToFileAndReturnIt(destination.child(slug(link)).asWritableFile(),
+            CopyOptions.copyDoNotOverwriteButIgnore().withDefaultReporting()));
       } catch (Exception e) {
-        log.error("couldn't extract links from {}", hyperLink);
+        log.error("couldn't extract links from {}", hyperLink, e);
         return Iterator.empty();
       }
     } else {

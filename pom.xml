@@ -75,7 +75,7 @@
     <dependency>
       <groupId>org.raisercostin</groupId>
       <artifactId>jedio</artifactId>
-      <version>0.27</version>
+      <version>0.94</version>
     </dependency>
     <dependency>
       <groupId>org.raisercostin</groupId>
@@ -287,11 +287,13 @@
       <groupId>com.typesafe</groupId>
       <artifactId>config</artifactId>
     </dependency>
+    <!--
     <dependency>
       <groupId>org.raisercostin</groupId>
       <artifactId>raisercostin-commons</artifactId>
       <version>2.27</version>
     </dependency>
+    -->
     <!-- logs -->
     <dependency>
       <groupId>org.slf4j</groupId>
@@ -633,24 +635,12 @@
   </build>
   <repositories>
     <repository>
-      <id>jcenter-bintray</id>
-      <url>https://jcenter.bintray.com/</url>
-      <releases>
-        <enabled>true</enabled>
-      </releases>
       <snapshots>
         <enabled>false</enabled>
       </snapshots>
-    </repository>
-    <repository>
-      <id>raisercostin-bintray</id>
-      <url>https://dl.bintray.com/raisercostin/maven</url>
-      <releases>
-        <enabled>true</enabled>
-      </releases>
-      <snapshots>
-        <enabled>false</enabled>
-      </snapshots>
+      <id>raisercostin-github</id>
+      <name>Repository at https://github.com/raisercostin/maven-repo</name>
+      <url>https://raw.githubusercontent.com/raisercostin/maven-repo/master</url>
     </repository>
   </repositories>
 </project>
