@@ -9,16 +9,16 @@ import org.raisercostin.jscraper.JScraper;
 class JCrawlerTest {
   @Test
   @Disabled
-  void testRevomatico() {
-    JCrawler.crawl(Locations.web("revomatico.com"), Option.none(),
-      Locations.dir("d:\\home\\raiser\\work\\_var_namek_jcrawl\\scan1-revomatico").mkdirIfNeeded());
+  void testRaisercostin() {
+    JCrawler.crawl(Locations.web("raisercostin.org"), Option.none(),
+      Locations.dir("d:\\home\\raiser\\work\\_var_namek_jcrawl\\scan1-raisercostin").mkdirIfNeeded());
   }
 
   @Test
   @Disabled
   void testRoweb() {
-    JCrawler.crawl(Locations.web("roweb.ro"), Option.none(),
-      Locations.dir("d:\\home\\raiser\\work\\_var_namek_jcrawl\\scan2-roweb").mkdirIfNeeded());
+    JCrawler.crawl(Locations.web("thebrainlight.org"), Option.none(),
+      Locations.dir("d:\\home\\raiser\\work\\_var_namek_jcrawl\\scan2-brainlight").mkdirIfNeeded());
   }
 
   @Test

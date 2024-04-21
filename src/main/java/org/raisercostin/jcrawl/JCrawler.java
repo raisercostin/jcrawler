@@ -60,12 +60,16 @@ public class JCrawler {
     Option<Set<String>> whitelist;
 
     public boolean acceptCrawl(SimpleUrl link) {
+      if (whitelist.isEmpty() || whitelist.get().isEmpty()) {
+        return true;
+      }
       return whitelist.get().contains(link.toExternalForm());
     }
   }
 
   public static void crawl(WebLocation webLocation, Option<ReadableFileLocation> whitelistSample,
       DirLocation destination) {
+    whitelistSample = whitelistSample.filter(x -> x.exists());
     CrawlConfig config = CrawlConfig.of(webLocation, whitelistSample);
     log.info("crawling [{}] to {}", webLocation, destination);
     List<HttpClientLocation> files = webLocation.ls().map(x -> x.asHttpClientLocation()).toList();

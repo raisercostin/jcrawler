@@ -35,9 +35,7 @@
     <git.repo>${project.artifactId}</git.repo>
     <git.host>github.com</git.host>
     <git.url>https://${git.host}/${git.userOrGroup}/${git.repo}</git.url>
-    <bintray.user>raisercostin</bintray.user>
-    <bintray.repo>maven</bintray.repo>
-    <bintray.package>${project.artifactId}</bintray.package>
+    <lombok.version>1.18.32</lombok.version>
     <maven.build.timestamp.format>yyyyMMdd'T'HHmmss</maven.build.timestamp.format>
     <dist.url>https://api.bintray.com/maven/${bintray.user}/${bintray.repo}/${bintray.package}</dist.url>
     <dist.release.url>${dist.url}/releases/</dist.release.url>
@@ -46,7 +44,6 @@
     <createChecksum>false</createChecksum>
     <maven.test.skip>false</maven.test.skip>
     <!--<docker.image.prefix>registry.gitlab.com/dcsi/all/docker/custom</docker.image.prefix> -->
-    <docker.image.prefix>com.revomatico</docker.image.prefix>
     <reactor.version>3.2.5.RELEASE</reactor.version>
     <spring.version>5.1.4.RELEASE</spring.version>
     <spring.boot.version>2.2.1.RELEASE</spring.boot.version>
@@ -75,12 +72,12 @@
     <dependency>
       <groupId>org.raisercostin</groupId>
       <artifactId>jedio</artifactId>
-      <version>0.94</version>
+      <version>0.96</version>
     </dependency>
     <dependency>
       <groupId>org.raisercostin</groupId>
       <artifactId>jedi-nodes-java</artifactId>
-      <version>0.9</version>
+      <version>0.32</version>
     </dependency>
     <dependency>
       <groupId>org.raisercostin</groupId>
@@ -281,6 +278,7 @@
     <dependency>
       <groupId>org.projectlombok</groupId>
       <artifactId>lombok</artifactId>
+      <version>${lombok.version}</version>
     </dependency>
     <!-- <dependency> <groupId>io.reactivex.rxjava2</groupId> <artifactId>rxjava</artifactId> <version>2.2.4</version> </dependency> -->
     <dependency>
