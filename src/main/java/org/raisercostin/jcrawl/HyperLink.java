@@ -23,6 +23,10 @@ import org.raisercostin.jedio.url.WebClientLocation;
 @FieldDefaults(makeFinal = true, level = AccessLevel.PUBLIC)
 @Slf4j
 public class HyperLink {
+  public static HyperLink of(String url) {
+    return new HyperLink(url, "original", "", null, null, null);
+  }
+
   public static HyperLink of(String relativeOrAbsoluteHyperlink, String text, String all, String sourceHyperlink,
       String sourceLocal) {
     WebClientLocation link = Locations.url(sourceHyperlink, relativeOrAbsoluteHyperlink);

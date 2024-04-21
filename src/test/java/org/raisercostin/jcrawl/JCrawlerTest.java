@@ -8,15 +8,14 @@ import org.raisercostin.jscraper.JScraper;
 
 class JCrawlerTest {
   @Test
-  @Disabled
+  //@Disabled
   void testRaisercostin() {
     JCrawler.crawl(Locations.web("raisercostin.org"), Option.none(),
       Locations.dir("d:\\home\\raiser\\work\\_var_namek_jcrawl\\scan1-raisercostin").mkdirIfNeeded());
   }
 
   @Test
-  @Disabled
-  void testRoweb() {
+  void testTheBrainlightOrg() {
     JCrawler.crawl(Locations.web("thebrainlight.org"), Option.none(),
       Locations.dir("d:\\home\\raiser\\work\\_var_namek_jcrawl\\scan2-brainlight").mkdirIfNeeded());
   }
