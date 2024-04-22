@@ -10,7 +10,6 @@ import io.vavr.collection.Seq;
 import io.vavr.collection.Set;
 import io.vavr.collection.Traversable;
 import io.vavr.control.Option;
-import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
@@ -50,15 +49,16 @@ public class JCrawler {
           .map(z -> SimpleUrl.from(z.link).withoutQuery().toExternalForm())
           .toSet());
       Seq<String> start = webLocation.ls().map(x -> x.asHttpClientLocation().toExternalForm()).toList();
-      return new CrawlConfig(start, cache, webLocation, start.toSet(), includeQuery, whitelist);
+      return new CrawlConfig(start, cache, webLocation, start.toSet(), includeQuery, whitelist, -1);
     }
 
-    Seq<String> start;
-    DirLocation cache;
-    WebLocation webLocation;
-    Set<String> children2;
-    boolean includeQuery;
-    Option<Set<String>> whitelist;
+    public Seq<String> start;
+    public DirLocation cache;
+    public WebLocation webLocation;
+    public Set<String> children;
+    public boolean includeQuery;
+    public Option<Set<String>> whitelist;
+    public int maxDocs = -1;
 
     public boolean acceptCrawl(SimpleUrl link) {
       if (whitelist == null || whitelist.isEmpty() || whitelist.get().isEmpty()) {
@@ -69,11 +69,11 @@ public class JCrawler {
 
     public boolean accept(SimpleUrl link) {
       String url = link.toExternalForm();
-      return children2.exists(x -> url.startsWith(x));
+      return children.exists(x -> url.startsWith(x));
     }
 
     public CrawlConfig withFilters(String... filters) {
-      return withChildren2(API.Set(filters));
+      return withChildren(API.Set(filters));
     }
   }
 
@@ -91,9 +91,6 @@ public class JCrawler {
     files.forEach(System.out::println);
     Set<String> visited = API.Set();
     crawl(config, visited, files.map(url -> HyperLink.of(url)), cache);
-    //    files.forEach(
-    //      file -> extractLinks(file.copyTo(destination.child(slug(file)).asWritableFile(),
-    //        CopyOptions.copyDoNotOverwrite().withDefaultReporting())));
   }
 
   //TODO - breadth first
@@ -102,47 +99,52 @@ public class JCrawler {
       DirLocation destination) {
     return todo.foldLeft(visited2, (visited, link) -> {
       SimpleUrl href = link.link(config.includeQuery);
-      if (!visited.contains(href.toExternalForm())) {
-        if (config.acceptCrawl(href)) {
-          return crawl(
-            config,
-            visited.add(href.toExternalForm()),
-            downloadAndExtractLinks(config, link, destination),
-            destination);
+      if (config.maxDocs < 0 || visited.size() < config.maxDocs) {
+        if (!visited.contains(href.toExternalForm())) {
+          if (config.acceptCrawl(href)) {
+            SimpleUrl hyperLink = link.link(config.includeQuery);
+            if (config.accept(hyperLink)) {
+              return crawl(
+                config,
+                visited.add(href.toExternalForm()),
+                downloadAndExtractLinks(config, hyperLink, destination),
+                destination);
+            } else {
+              log.info("following not allowed for [{}]", link.link);
+              return visited;
+            }
+          } else {
+            log.info("ignored [{}]", link);
+            return visited;
+          }
         } else {
-          log.info("ignored {}", link);
+          log.info("already visited [{}]", link);
           return visited;
         }
       } else {
-        log.info("already visited {}", link);
+        log.debug("limit reached [{}]", link);
         return visited;
       }
     });
   }
 
-  private static Traversable<HyperLink> downloadAndExtractLinks(CrawlConfig config, HyperLink hyperLink,
+  private static Traversable<HyperLink> downloadAndExtractLinks(CrawlConfig config, SimpleUrl link,
       DirLocation destination) {
-    SimpleUrl link = hyperLink.link(config.includeQuery);
-    if (config.accept(link)) {
-      try {
-        RequestResponse content = WebClientLocation2.get(link).readCompleteContentSync(null);
-        WritableFileLocation dest = destination.child(slug(link)).asWritableFile();
-        dest.write(content.getBody());
-        ReferenceLocation metaJson = dest.meta("", ".meta.json");
-        metaJson.asPathLocation().write(content.computeMetadata());
-        //Locations.url(link)
-        //        .copyToFileAndReturnIt(dest,
-        //          CopyOptions
-        //            .copyDoNotOverwriteButIgnore()
-        //            .withCopyMeta(true)
-        //            .withDefaultReporting())
-        return extractLinks(dest, metaJson);
-      } catch (Exception e) {
-        log.error("couldn't extract links from {}", hyperLink, e);
-        return Iterator.empty();
-      }
-    } else {
-      log.info("following not allowed for\n[{}]\n[{}]", hyperLink.link, link.toExternalForm());
+    try {
+      RequestResponse content = WebClientLocation2.get(link).readCompleteContentSync(null);
+      WritableFileLocation dest = destination.child(slug(link)).asWritableFile();
+      dest.write(content.getBody());
+      ReferenceLocation metaJson = dest.meta("", ".meta.json");
+      metaJson.asPathLocation().write(content.computeMetadata());
+      //Locations.url(link)
+      //        .copyToFileAndReturnIt(dest,
+      //          CopyOptions
+      //            .copyDoNotOverwriteButIgnore()
+      //            .withCopyMeta(true)
+      //            .withDefaultReporting())
+      return extractLinks(dest, metaJson);
+    } catch (Exception e) {
+      log.error("couldn't extract links from {}", link, e);
       return Iterator.empty();
     }
   }

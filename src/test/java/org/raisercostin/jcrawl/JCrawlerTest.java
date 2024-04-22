@@ -64,7 +64,10 @@ class JCrawlerTest {
         .withCache(Locations.dir("d:\\home\\raiser\\work\\_var_namek_jcrawl\\scan4-just").mkdirIfNeeded())
         .withFilters("https://legislatie.just.ro/Public/DetaliiDocument/1",
           "https://legislatie.just.ro/Public/DetaliiDocumentAfis/1",
-          "https://legislatie.just.ro/Public/DetaliiDocument/2"));
+          "https://legislatie.just.ro/Public/DetaliiDocument/2")
+        .withMaxDocs(5)
+    //
+    );
     //add maxDocs:100, parallelism:5
   }
 }
