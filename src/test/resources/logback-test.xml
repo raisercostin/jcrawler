@@ -12,7 +12,7 @@
 		<encoder>
 			<!-- eclipse clickable place -->
 			<!-- %4relative %highlight - to color-->
-			<pattern>%4relative [%level] [%-10.10thread] \(%file:%line\) %-120message - %logger{10.10}.%-20.20method - %n%xException</pattern>
+			<pattern>%4relative [%level] [%-10thread] \(%file:%line\) %-120message - %logger{10}.%-20.20method - %n%xException</pattern>
 		</encoder>
 	</appender>
 
@@ -21,7 +21,7 @@
 	        <prudent>false</prudent>
 		<file>${logs}/namek.log</file>
 		<encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
-			<pattern>%4relative [%level] [%-10.10thread] %-200message%xThrowable - %date{yyyy-MM-dd-'T'-HH-mm-ss-SSS} %logger.%method\(%file:%line\)%n</pattern>
+			<pattern>%4relative [%level] [%-10thread] %-200message%xThrowable - %date{yyyy-MM-dd-'T'-HH-mm-ss-SSS} %logger.%method\(%file:%line\)%n</pattern>
 			<!--
 			<pattern>%date %5p [%t] %logger.%M\(%F:%L\) - %m%n</pattern>
 			<pattern>%4relative %5p [%-17thread] - %-200msg - %date %logger{30}\(%file:%line\)%n</pattern>
@@ -41,7 +41,7 @@
 		class="ch.qos.logback.core.rolling.RollingFileAppender">
 		<file>${logs}/namek-warn.log</file>
 		<encoder class="ch.qos.logback.classic.encoder.PatternLayoutEncoder">
-			<pattern>%4relative %level [%-10.10thread] %-200message - $d %logger{30}.%M\(%file:%line\)%n</pattern>
+			<pattern>%4relative %level [%-10thread] %-200message - $d %logger{30}.%M\(%file:%line\)%n</pattern>
 		</encoder>
 		<rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
 			<fileNamePattern>${logs}/namek-warn-%d{yyyy-MM-dd}-%02i.log</fileNamePattern>

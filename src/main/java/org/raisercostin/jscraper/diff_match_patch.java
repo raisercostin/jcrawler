@@ -33,8 +33,6 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import com.esotericsoftware.minlog.Log;
-
 /*
  * Functions for diff, match and patch.
  * Computes the difference between two texts to create a patch.

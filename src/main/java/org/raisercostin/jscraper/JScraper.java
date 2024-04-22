@@ -17,7 +17,6 @@ import lombok.SneakyThrows;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import lombok.extern.slf4j.Slf4j;
-import namek.ExtractorUtils;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Entities.EscapeMode;
@@ -92,7 +91,7 @@ public class JScraper {
     @SneakyThrows
     public Document normalizePage() {
       String content = crawl.readContent();
-      content = ExtractorUtils.replaceEntities(content);
+      // content = ExtractorUtils.replaceEntities(content);
       String url = httpMeta().httpMetaRequestUri().get();
       return Jsoup.parse(content, url);
     }

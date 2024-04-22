@@ -24,20 +24,23 @@ import org.raisercostin.jedio.url.WebClientLocation;
 @Slf4j
 public class HyperLink {
   public static HyperLink of(String url) {
-    return new HyperLink(url, "original", "", null, null, null);
+    return new HyperLink(url, "original", "", null, null, null, null);
   }
 
-  public static HyperLink of(String relativeOrAbsoluteHyperlink, String text, String all, String sourceHyperlink,
+  public static HyperLink of(String relativeOrAbsoluteHyperlink, String text, String anchor, String all,
+      String sourceHyperlink,
       String sourceLocal) {
-    WebClientLocation link = Locations.url(sourceHyperlink, relativeOrAbsoluteHyperlink);
+    String url = SimpleUrl.resolve(sourceHyperlink, relativeOrAbsoluteHyperlink);
+    //WebClientLocation link = Locations.url(sourceHyperlink, relativeOrAbsoluteHyperlink);
     //TODO link should not contain #fragments since link is used for uniqueness
-    return new HyperLink(link.toExternalForm(), relativeOrAbsoluteHyperlink, text, all, sourceHyperlink, sourceLocal);
+    return new HyperLink(url, relativeOrAbsoluteHyperlink, text, anchor, all, sourceHyperlink, sourceLocal);
   }
 
   String link;
   String relativeOrAbsoluteHyperlink;
   @ToString.Exclude
   String text;
+  String anchor;
   @ToString.Exclude
   String all;
   String sourceHyperlink;

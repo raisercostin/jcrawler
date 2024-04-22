@@ -12,12 +12,10 @@ import io.vavr.collection.Traversable;
 import io.vavr.control.Option;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
-import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
-import lombok.Value;
+import lombok.ToString;
+import lombok.With;
 import lombok.val;
-import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.raisercostin.jedio.DirLocation;
 import org.raisercostin.jedio.Locations;
@@ -35,46 +33,64 @@ import org.springframework.http.MediaType;
 
 @Slf4j
 public class JCrawler {
-  @Value
-  @NoArgsConstructor(access = AccessLevel.PRIVATE, force = true)
   @AllArgsConstructor
-  @Getter(lombok.AccessLevel.NONE)
-  @Setter(lombok.AccessLevel.NONE)
-  @FieldDefaults(makeFinal = true, level = AccessLevel.PUBLIC)
-  @Slf4j
+  @NoArgsConstructor
+  @ToString
+  @With
   public static class CrawlConfig {
-    public static CrawlConfig of(WebLocation webLocation, Option<ReadableFileLocation> whitelistSample) {
+    public static CrawlConfig start(String... urls) {
+      return new CrawlConfig().withStart(API.Seq(urls));
+    }
+
+    public static CrawlConfig of(WebLocation webLocation, DirLocation cache,
+        Option<ReadableFileLocation> whitelistSample) {
       boolean includeQuery = false;
       Option<Set<String>> whitelist = whitelistSample
         .map(x -> extractLinksFromContent(x.readContent(), null, null)
           .map(z -> SimpleUrl.from(z.link).withoutQuery().toExternalForm())
           .toSet());
-      return new CrawlConfig(webLocation, webLocation.ls().map(x -> x.asHttpClientLocation().toExternalForm()).toSet(),
-        includeQuery, whitelist);
+      Seq<String> start = webLocation.ls().map(x -> x.asHttpClientLocation().toExternalForm()).toList();
+      return new CrawlConfig(start, cache, webLocation, start.toSet(), includeQuery, whitelist);
     }
 
+    Seq<String> start;
+    DirLocation cache;
     WebLocation webLocation;
-    Set<String> children;
+    Set<String> children2;
     boolean includeQuery;
     Option<Set<String>> whitelist;
 
     public boolean acceptCrawl(SimpleUrl link) {
-      if (whitelist.isEmpty() || whitelist.get().isEmpty()) {
+      if (whitelist == null || whitelist.isEmpty() || whitelist.get().isEmpty()) {
         return true;
       }
       return whitelist.get().contains(link.toExternalForm());
     }
+
+    public boolean accept(SimpleUrl link) {
+      String url = link.toExternalForm();
+      return children2.exists(x -> url.startsWith(x));
+    }
+
+    public CrawlConfig withFilters(String... filters) {
+      return withChildren2(API.Set(filters));
+    }
+  }
+
+  public static void crawl(CrawlConfig config) {
+    Set<String> visited = API.Set();
+    crawl(config, visited, config.start.map(x -> HyperLink.of(x)), config.cache);
   }
 
   public static void crawl(WebLocation webLocation, Option<ReadableFileLocation> whitelistSample,
-      DirLocation destination) {
+      DirLocation cache) {
     whitelistSample = whitelistSample.filter(x -> x.exists());
-    CrawlConfig config = CrawlConfig.of(webLocation, whitelistSample);
-    log.info("crawling [{}] to {}", webLocation, destination);
-    List<String> files = webLocation.ls().map(x -> x.asHttpClientLocation().toExternalForm()).toList();
+    CrawlConfig config = CrawlConfig.of(webLocation, cache, whitelistSample);
+    log.info("crawling [{}] to {}", webLocation, cache);
+    Seq<String> files = config.start;
     files.forEach(System.out::println);
     Set<String> visited = API.Set();
-    crawl(config, visited, files.map(url -> HyperLink.of(url)), destination);
+    crawl(config, visited, files.map(url -> HyperLink.of(url)), cache);
     //    files.forEach(
     //      file -> extractLinks(file.copyTo(destination.child(slug(file)).asWritableFile(),
     //        CopyOptions.copyDoNotOverwrite().withDefaultReporting())));
@@ -86,14 +102,19 @@ public class JCrawler {
       DirLocation destination) {
     return todo.foldLeft(visited2, (visited, link) -> {
       SimpleUrl href = link.link(config.includeQuery);
-      if (!visited.contains(href.toExternalForm()) && config.acceptCrawl(href)) {
-        return crawl(
-          config,
-          visited.add(href.toExternalForm()),
-          downloadAndExtractLinks(config, link, destination),
-          destination);
+      if (!visited.contains(href.toExternalForm())) {
+        if (config.acceptCrawl(href)) {
+          return crawl(
+            config,
+            visited.add(href.toExternalForm()),
+            downloadAndExtractLinks(config, link, destination),
+            destination);
+        } else {
+          log.info("ignored {}", link);
+          return visited;
+        }
       } else {
-        log.info("already visited or ignored {}", link);
+        log.info("already visited {}", link);
         return visited;
       }
     });
@@ -102,7 +123,7 @@ public class JCrawler {
   private static Traversable<HyperLink> downloadAndExtractLinks(CrawlConfig config, HyperLink hyperLink,
       DirLocation destination) {
     SimpleUrl link = hyperLink.link(config.includeQuery);
-    if (accept(config, link)) {
+    if (config.accept(link)) {
       try {
         RequestResponse content = WebClientLocation2.get(link).readCompleteContentSync(null);
         WritableFileLocation dest = destination.child(slug(link)).asWritableFile();
@@ -121,14 +142,9 @@ public class JCrawler {
         return Iterator.empty();
       }
     } else {
-      log.info("following not allowed {}", hyperLink);
+      log.info("following not allowed for\n[{}]\n[{}]", hyperLink.link, link.toExternalForm());
       return Iterator.empty();
     }
-  }
-
-  private static boolean accept(CrawlConfig config, SimpleUrl link) {
-    String url = link.toExternalForm();
-    return config.children.exists(x -> url.startsWith(x));
   }
 
   //val notParsedUrls = Seq("javascript", "tel")
@@ -153,7 +169,7 @@ public class JCrawler {
         //String sourceUrl = meta2.httpMetaRequestUri().get();
         all = all
           .append(
-            HyperLink.of(meta.responseHeaders.getLocation().toString(), "Moved Permanently - 301", "", sourceUrl,
+            HyperLink.of(meta.responseHeaders.getLocation().toString(), "Moved Permanently - 301", null, "", sourceUrl,
               source.toExternalForm()));
       }
 
@@ -170,7 +186,8 @@ public class JCrawler {
   }
 
   private static Pattern exp(String sep) {
-    return Pattern.compile("(?i)(?s)<a[^>]*\\s+href=" + sep + "([^" + sep + "]*)" + sep + "[^>]*>(.*?)</a>");
+    return Pattern
+      .compile("(?i)(?s)<a[^>]*\\s+href=" + sep + "([^" + sep + "#]*)(#[^" + sep + "]*)?" + sep + "[^>]*>(.*?)</a>");
     //regular expressions with named group consumes 17% of all time
     //("href", "text")
   }
@@ -189,7 +206,8 @@ public class JCrawler {
     result = allExp.iterator().flatMap(exp -> {
       Iterator<Matcher> all = Iterator.continually(exp.matcher(content)).takeWhile(matcher -> matcher.find());
       return all.map(
-        m -> HyperLink.of(m.group(1).trim(), m.group(2).trim(), m.group().trim(), sourceUrl, source));
+        m -> HyperLink.of(m.group(1).trim(), m.group(3).trim(), m.group(2), m.group().trim(), sourceUrl,
+          source));
     });
     return result;
   }
