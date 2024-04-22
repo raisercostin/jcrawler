@@ -26,9 +26,12 @@ import org.raisercostin.jedio.url.SimpleUrl;
 import org.raisercostin.jedio.url.WebClientLocation2;
 import org.raisercostin.jedio.url.WebClientLocation2.RequestResponse;
 import org.raisercostin.jedio.url.WebClientLocation2.RequestResponse.Metadata;
+import org.raisercostin.jedio.url.WebClientLocation2.WebClientFactory;
 import org.raisercostin.jedio.url.WebLocation;
 import org.raisercostin.nodes.Nodes;
 import org.springframework.http.MediaType;
+import reactor.netty.http.HttpProtocol;
+import reactor.netty.http.client.HttpClient;
 
 @Slf4j
 public class JCrawler {
@@ -49,7 +52,7 @@ public class JCrawler {
           .map(z -> SimpleUrl.from(z.link).withoutQuery().toExternalForm())
           .toSet());
       Seq<String> start = webLocation.ls().map(x -> x.asHttpClientLocation().toExternalForm()).toList();
-      return new CrawlConfig(start, cache, webLocation, start.toSet(), includeQuery, whitelist, -1);
+      return new CrawlConfig(start, cache, webLocation, start.toSet(), includeQuery, whitelist, -1, null);
     }
 
     public Seq<String> start;
@@ -59,6 +62,7 @@ public class JCrawler {
     public boolean includeQuery;
     public Option<Set<String>> whitelist;
     public int maxDocs = -1;
+    public HttpProtocol[] protocols;
 
     public boolean acceptCrawl(SimpleUrl link) {
       if (whitelist == null || whitelist.isEmpty() || whitelist.get().isEmpty()) {
@@ -75,11 +79,16 @@ public class JCrawler {
     public CrawlConfig withFilters(String... filters) {
       return withChildren(API.Set(filters));
     }
+
+    public CrawlConfig withProtocol(HttpProtocol... protocols) {
+      return withProtocols(protocols);
+    }
   }
 
   public static void crawl(CrawlConfig config) {
     Set<String> visited = API.Set();
-    crawl(config, visited, config.start.map(x -> HyperLink.of(x)), config.cache);
+    JCrawler crawler = new JCrawler(config);
+    crawler.crawl(visited, config.start.map(x -> HyperLink.of(x)));
   }
 
   public static void crawl(WebLocation webLocation, Option<ReadableFileLocation> whitelistSample,
@@ -90,13 +99,21 @@ public class JCrawler {
     Seq<String> files = config.start;
     files.forEach(System.out::println);
     Set<String> visited = API.Set();
-    crawl(config, visited, files.map(url -> HyperLink.of(url)), cache);
+    JCrawler crawler = new JCrawler(config);
+    crawler.crawl(visited, files.map(url -> HyperLink.of(url)));
+  }
+
+  public final CrawlConfig config;
+  public final WebClientFactory client;
+
+  public JCrawler(CrawlConfig config) {
+    this.config = config;
+    this.client = new WebClientFactory(config.protocols);
   }
 
   //TODO - breadth first
   //depth first
-  private static Set<String> crawl(CrawlConfig config, Set<String> visited2, Traversable<HyperLink> todo,
-      DirLocation destination) {
+  private Set<String> crawl(Set<String> visited2, Traversable<HyperLink> todo) {
     return todo.foldLeft(visited2, (visited, link) -> {
       SimpleUrl href = link.link(config.includeQuery);
       if (config.maxDocs < 0 || visited.size() < config.maxDocs) {
@@ -104,11 +121,8 @@ public class JCrawler {
           if (config.acceptCrawl(href)) {
             SimpleUrl hyperLink = link.link(config.includeQuery);
             if (config.accept(hyperLink)) {
-              return crawl(
-                config,
-                visited.add(href.toExternalForm()),
-                downloadAndExtractLinks(config, hyperLink, destination),
-                destination);
+              Traversable<HyperLink> newTodo = downloadAndExtractLinks(hyperLink);
+              return crawl(visited.add(href.toExternalForm()), newTodo);
             } else {
               log.info("following not allowed for [{}]", link.link);
               return visited;
@@ -128,11 +142,10 @@ public class JCrawler {
     });
   }
 
-  private static Traversable<HyperLink> downloadAndExtractLinks(CrawlConfig config, SimpleUrl link,
-      DirLocation destination) {
+  private Traversable<HyperLink> downloadAndExtractLinks(SimpleUrl link) {
     try {
-      RequestResponse content = WebClientLocation2.get(link).readCompleteContentSync(null);
-      WritableFileLocation dest = destination.child(slug(link)).asWritableFile();
+      RequestResponse content = client.get(link.toExternalForm()).readCompleteContentSync(null);
+      WritableFileLocation dest = config.cache.child(slug(link)).asWritableFile();
       dest.write(content.getBody());
       ReferenceLocation metaJson = dest.meta("", ".meta.json");
       metaJson.asPathLocation().write(content.computeMetadata());
@@ -144,6 +157,7 @@ public class JCrawler {
       //            .withDefaultReporting())
       return extractLinks(dest, metaJson);
     } catch (Exception e) {
+      //TODO write in meta the error?
       log.error("couldn't extract links from {}", link, e);
       return Iterator.empty();
     }
@@ -174,7 +188,6 @@ public class JCrawler {
             HyperLink.of(meta.responseHeaders.getLocation().toString(), "Moved Permanently - 301", null, "", sourceUrl,
               source.toExternalForm()));
       }
-
       //      YAMLMapper mapper = Nodes.yml.mapper();
       //      mapper.configure(YAMLGenerator.Feature.LITERAL_BLOCK_STYLE, true);
       //      mapper.configure(YAMLGenerator.Feature.MINIMIZE_QUOTES, true);
