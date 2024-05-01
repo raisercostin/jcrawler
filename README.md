@@ -11,6 +11,10 @@ Crawiling in java
   - [x] strategies - guava traversers
     - [x] depth first
     - [x] breadth first
+  - [x] add cache on disk - disk io is faster than network io
+    - [x] expiryDuration for now
+    - [ ] could implement etag (so call OPTION first and not GET)
+  - [ ] do not overwrite on redownload but rename old version
   - [ ] max parallel threads
   - [ ] max calls/second
   - [ ] link seeders/generators

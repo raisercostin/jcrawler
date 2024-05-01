@@ -2,6 +2,8 @@ package org.raisercostin.jcrawl;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Duration;
+
 import io.vavr.control.Option;
 import org.jedio.struct.RichIterable;
 import org.junit.jupiter.api.Disabled;
@@ -52,6 +54,7 @@ class JCrawlerTest {
       "https://legislatie.just.ro/Public/DetaliiDocument/1",
       "https://legislatie.just.ro/Public/DetaliiDocumentAfis/1",
       "https://legislatie.just.ro/Public/DetaliiDocument/2")
+    .withCacheExpiryDuration(Duration.ofDays(100))
     .withMaxDocs(5)
     .withMaxConnections(5)
     .withProtocol(HttpProtocol.HTTP11);
@@ -61,7 +64,6 @@ class JCrawlerTest {
   void testLegeBreadthFirst() {
     //    WebClientLocation2.defaultClient.webclientWireTap.enable();
     //    WebClientLocation2.defaultClient.webclientWireTapType.setRuntimeValue(AdvancedByteBufFormat.HEX_DUMP);
-    //TODO add cache on disk - disk io is faster than network io
     //TODO add parallelism - ParallelTraverser?
     //TODO use different httpclients
     //TODO use native java httpclient

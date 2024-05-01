@@ -1,9 +1,15 @@
 package org.raisercostin.jcrawl;
 
+import java.time.Duration;
+import java.time.Instant;
+import java.time.temporal.TemporalAmount;
 import java.util.concurrent.Semaphore;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.cfg.MapperBuilder;
+import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
 import com.google.common.graph.Traverser;
 import io.vavr.API;
 import io.vavr.collection.Iterator;
@@ -18,6 +24,7 @@ import lombok.ToString;
 import lombok.With;
 import lombok.val;
 import lombok.extern.slf4j.Slf4j;
+import org.checkerframework.checker.nullness.qual.NonNull;
 import org.jedio.struct.RichIterable;
 import org.raisercostin.jedio.DirLocation;
 import org.raisercostin.jedio.Locations;
@@ -29,7 +36,9 @@ import org.raisercostin.jedio.url.WebClientLocation2.RequestResponse;
 import org.raisercostin.jedio.url.WebClientLocation2.RequestResponse.Metadata;
 import org.raisercostin.jedio.url.WebClientLocation2.WebClientFactory;
 import org.raisercostin.jedio.url.WebLocation;
+import org.raisercostin.nodes.JacksonNodes;
 import org.raisercostin.nodes.Nodes;
+import org.raisercostin.nodes.impl.JsonNodes;
 import org.springframework.http.MediaType;
 import reactor.netty.http.HttpProtocol;
 
@@ -75,13 +84,15 @@ public class JCrawler {
           .map(z -> z.withoutQuery())
           .toSet());
       Seq<String> start = webLocation.ls().map(x -> x.asHttpClientLocation().toExternalForm()).toList();
-      return new CrawlConfig(TraversalType.BREADTH_FIRST, start, cache, webLocation, start.toSet(), includeQuery,
+      return new CrawlConfig(TraversalType.BREADTH_FIRST, Nodes.json, start, cache, webLocation, start.toSet(),
+        includeQuery,
         whitelist,
-        -1, -1, null);
+        -1, -1, null, Duration.ofDays(100));
     }
 
     /**Breadth first is usual.*/
     public TraversalType traversalType = TraversalType.BREADTH_FIRST;
+    public JacksonNodes linksNodes = Nodes.json;
     public Seq<String> start;
     public DirLocation cache;
     public WebLocation webLocation;
@@ -91,6 +102,7 @@ public class JCrawler {
     public int maxDocs = -1;
     public int maxConnections = -1;
     public HttpProtocol[] protocols;
+    public TemporalAmount cacheExpiryDuration = Duration.ofDays(100);
 
     public boolean accept(HyperLink link) {
       if (exactMatch == null || exactMatch.isEmpty() || exactMatch.get().isEmpty()) {
@@ -109,6 +121,10 @@ public class JCrawler {
 
     public CrawlConfig withProtocol(HttpProtocol... protocols) {
       return withProtocols(protocols);
+    }
+
+    public boolean forceDownload(HyperLink href, WritableFileLocation dest) {
+      return dest.modifiedDateTime().toInstant().isBefore(Instant.now().minus(cacheExpiryDuration));
     }
   }
 
@@ -181,20 +197,41 @@ public class JCrawler {
       return Iterator.empty();
     }
     try {
-      semaphore.acquire();
-      log.info("start [{}]", href.externalForm);
-      RequestResponse content = client.get(href.externalForm).readCompleteContentSync(null);
       WritableFileLocation dest = config.cache.child(slug(href)).asWritableFile();
-      dest.write(content.getBody());
+
+      Traversable<HyperLink> links = null;
+      boolean exists = dest.exists();
+      boolean forcedDownload = exists && config.forceDownload(href, dest);
       ReferenceLocation metaJson = dest.meta("", ".meta.json");
-      metaJson.asPathLocation().write(content.computeMetadata());
+      if (!exists || forcedDownload) {
+        try {
+          semaphore.acquire();
+          log.info("download from url [{}]", href.externalForm);
+          RequestResponse content = client.get(href.externalForm).readCompleteContentSync(null);
+          String body = content.getBody();
+          dest.write(body);
+          Metadata metadata = content.getMetadata();
+          metaJson.asPathLocation().write(content.computeMetadata());
+          links = extractLinksInMemory(body, dest, metadata);
+        } finally {
+          log.info("download from url done [{}]", href.externalForm);
+          semaphore.release();
+        }
+      } else {
+        try {
+          log.info("download from cache [{}]", href.externalForm);
+          links = extractLinksFromDisk(dest, metaJson);
+        } finally {
+          log.info("download from cache done [{}]", href.externalForm);
+        }
+      }
       //Locations.url(link)
       //        .copyToFileAndReturnIt(dest,
       //          CopyOptions
       //            .copyDoNotOverwriteButIgnore()
       //            .withCopyMeta(true)
       //            .withDefaultReporting())
-      return extractLinks(dest, metaJson)
+      return links
         //Filter out self reference when traversing
         .filter(x -> !x.externalForm.equals(href.externalForm))
         .filter(config::accept);
@@ -202,47 +239,66 @@ public class JCrawler {
       //TODO write in meta the error?
       log.error("couldn't extract links from {}", href.externalForm, e);
       return Iterator.empty();
-    } finally {
-      log.info("end [{}]", href.externalForm);
-      semaphore.release();
     }
+  }
+
+  private Traversable<HyperLink> extractLinksFromDisk(WritableFileLocation source, ReferenceLocation metaJson) {
+    String metaContent = metaJson.asReadableFile().readContent();
+    Metadata meta = Nodes.json.toObject(metaContent, Metadata.class);
+    String content = source.asReadableFile().readContent();
+    return extractLinksInMemory(content, source, meta);
   }
 
   //val notParsedUrls = Seq("javascript", "tel")
   //Extract links from content taking into consideration the base url but also the possible <base> tag attribute.
   //<base href="http://www.cartierbratieni.ro/" />
-  private static Traversable<HyperLink> extractLinks(WritableFileLocation source, ReferenceLocation metaJson) {
+  private Traversable<HyperLink> extractLinksInMemory(String content, WritableFileLocation source,
+      Metadata meta) {
+    JacksonNodes nodes = config.linksNodes;
     ReferenceLocation metaLinks = source.meta("", ".links.json");
-    if (!metaLinks.exists()) {
-      String metaContent = metaJson.asReadableFile().readContent();
-      Metadata meta = Nodes.json.toObject(metaContent, Metadata.class);
-      //Option<String> contentType = meta.responseHeaders.getContentType()==MediaType.TEXT_HTML;
-      boolean isHtmlAnd200 = meta.responseHeaders.getContentType().getType().equals(MediaType.TEXT_HTML.getType())
-          &&
-          meta.statusCodeValue == 200;
-      log.info("searching links in [{}] from {}", meta.responseHeaders.getContentType(), source);
-      String sourceUrl = meta.url;
-      //String sourceUrl = meta2.httpMetaRequestUri().get();
-      Iterator<HyperLink> result = isHtmlAnd200 ? extractLinks(source, sourceUrl) : Iterator.empty();
-      List<HyperLink> all = result.toList();
-      int status = meta.statusCodeValue;
-      if (300 <= status && status < 400 && meta.responseHeaders.getLocation() != null) {
-        //String sourceUrl = meta2.httpMetaRequestUri().get();
-        all = all
-          .append(
-            HyperLink.of(meta.responseHeaders.getLocation().toString(), "Moved Permanently - 301", null, "", sourceUrl,
-              source.toExternalForm()));
+    if (metaLinks.exists()) {
+      try {
+        Iterator<@NonNull HyperLink> all = nodes.toIterator(metaLinks.asReadableFile().readContent(),
+          HyperLink.class);
+        HyperLink firstElement = all.headOption().getOrNull();
+
+        // Rebuild the iterator with the first element not consumed
+        Iterator<HyperLink> newIterator = firstElement != null
+            ? Iterator.concat(Iterator.of(firstElement), all)
+            : all;
+        return newIterator;
+      } catch (com.fasterxml.jackson.databind.RuntimeJsonMappingException e) {
+        log.info(
+          "Ignoring links cache from {} and read links again for a parsing error. Enable trace for full details.",
+          metaLinks, e.getMessage());
+        log.trace("Ignoring links cache from {} and read links again for a parsing error.", metaLinks, e);
       }
-      //      YAMLMapper mapper = Nodes.yml.mapper();
-      //      mapper.configure(YAMLGenerator.Feature.LITERAL_BLOCK_STYLE, true);
-      //      mapper.configure(YAMLGenerator.Feature.MINIMIZE_QUOTES, true);
-      //      mapper.configure(YAMLGenerator.Feature.WRITE_DOC_START_MARKER, false);
-      String c = Nodes.json.toString(all);
-      metaLinks.asWritableFile().write(c);
-      return all;
-    } else {
-      return Nodes.json.toIterator(metaLinks.asReadableFile().readContent(), HyperLink.class);
     }
+    //Option<String> contentType = meta.responseHeaders.getContentType()==MediaType.TEXT_HTML;
+    boolean isHtmlAnd200 = meta.responseHeaders.getContentType().getType().equals(MediaType.TEXT_HTML.getType())
+        &&
+        meta.statusCodeValue == 200;
+    log.info("searching links in [{}] from {}", meta.responseHeaders.getContentType(), source);
+    String sourceUrl = meta.url;
+    //String sourceUrl = meta2.httpMetaRequestUri().get();
+    Iterator<HyperLink> result = isHtmlAnd200 ? extractLinksFromContent(content, source.toExternalForm(), sourceUrl)
+        : Iterator.empty();
+    List<HyperLink> all = result.toList();
+    int status = meta.statusCodeValue;
+    if (300 <= status && status < 400 && meta.responseHeaders.getLocation() != null) {
+      //String sourceUrl = meta2.httpMetaRequestUri().get();
+      all = all
+        .append(
+          HyperLink.of(meta.responseHeaders.getLocation().toString(), "Moved Permanently - 301", null, "", sourceUrl,
+            source.toExternalForm()));
+    }
+    //      YAMLMapper mapper = Nodes.yml.mapper();
+    //      mapper.configure(YAMLGenerator.Feature.LITERAL_BLOCK_STYLE, true);
+    //      mapper.configure(YAMLGenerator.Feature.MINIMIZE_QUOTES, true);
+    //      mapper.configure(YAMLGenerator.Feature.WRITE_DOC_START_MARKER, false);
+    String c = nodes.toString(all);
+    metaLinks.asWritableFile().write(c);
+    return all;
   }
 
   private static Pattern exp(String sep) {
@@ -254,14 +310,7 @@ public class JCrawler {
 
   private final static Seq<Pattern> allExp = API.Seq(exp("'"), exp("\\\""));
 
-  private static Iterator<HyperLink> extractLinks(WritableFileLocation source, String sourceUrl) {
-    val content = source.asReadableFile().readContent();
-    return extractLinksFromContent(content, source.toExternalForm(), sourceUrl);
-  }
-
-  private static Iterator<HyperLink> extractLinksFromContent(final java.lang.String content,
-      String source,
-      String sourceUrl) {
+  private static Iterator<HyperLink> extractLinksFromContent(final String content, String source, String sourceUrl) {
     Iterator<HyperLink> result;
     result = allExp.iterator().flatMap(exp -> {
       Iterator<Matcher> all = Iterator.continually(exp.matcher(content)).takeWhile(matcher -> matcher.find());

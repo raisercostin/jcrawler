@@ -29,11 +29,11 @@ public class HyperLink {
 
   public static HyperLink of(String relativeOrAbsoluteHyperlink, String text, String anchor, String all,
       String sourceHyperlink,
-      String sourceLocal) {
+      String localCache) {
     String url = SimpleUrl.resolve(sourceHyperlink, relativeOrAbsoluteHyperlink);
     //WebClientLocation link = Locations.url(sourceHyperlink, relativeOrAbsoluteHyperlink);
     //TODO link should not contain #fragments since link is used for uniqueness
-    return new HyperLink(url, relativeOrAbsoluteHyperlink, text, anchor, all, sourceHyperlink, sourceLocal);
+    return new HyperLink(url, relativeOrAbsoluteHyperlink, text, anchor, all, sourceHyperlink, localCache);
   }
 
   String externalForm;
@@ -44,7 +44,7 @@ public class HyperLink {
   @ToString.Exclude
   String all;
   String sourceHyperlink;
-  String sourceLocal;
+  String localCache;
 
   @ToString.Include
   String text() {
