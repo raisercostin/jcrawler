@@ -7,6 +7,7 @@ import org.jedio.struct.RichIterable;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.raisercostin.jcrawl.JCrawler.CrawlConfig;
+import org.raisercostin.jcrawl.JCrawler.TraversalType;
 import org.raisercostin.jedio.Locations;
 import org.raisercostin.jedio.url.WebClientLocation2;
 import org.raisercostin.jedio.url.WebClientLocation2.WebClientFactory;
@@ -49,7 +50,7 @@ class JCrawlerTest {
   void testLege() {
     //    WebClientLocation2.defaultClient.webclientWireTap.enable();
     //    WebClientLocation2.defaultClient.webclientWireTapType.setRuntimeValue(AdvancedByteBufFormat.HEX_DUMP);
-    //TODO - strategies: depth first, breadth first - guava traversers
+    //TODO
     //TODO add parallelism - ParallelTraverser?
     //TODO use different httpclients
     //TODO use native java httpclient
@@ -59,6 +60,7 @@ class JCrawlerTest {
       CrawlConfig
         .start("https://legislatie.just.ro/Public/DetaliiDocument/1")
         .withCache(Locations.dir("d:\\home\\raiser\\work\\_var_namek_jcrawl\\scan4-just").mkdirIfNeeded())
+        .withTraversalType(TraversalType.BREADTH_FIRST)
         .withFiltersByPrefix(
           "https://legislatie.just.ro/Public/DetaliiDocument/1",
           "https://legislatie.just.ro/Public/DetaliiDocumentAfis/1",

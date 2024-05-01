@@ -36,6 +36,29 @@ import reactor.netty.http.HttpProtocol;
 
 @Slf4j
 public class JCrawler {
+  public enum TraversalType {
+    BREADTH_FIRST {
+      @Override
+      Iterable<HyperLink> traverse(Traverser<HyperLink> traverser, Traversable<HyperLink> todo) {
+        return traverser.breadthFirst(todo);
+      }
+    },
+    DEPTH_FIRST_PREORDER {
+      @Override
+      Iterable<HyperLink> traverse(Traverser<HyperLink> traverser, Traversable<HyperLink> todo) {
+        return traverser.depthFirstPreOrder(todo);
+      }
+    },
+    DEPTH_FIRST_POSTORDER {
+      @Override
+      Iterable<HyperLink> traverse(Traverser<HyperLink> traverser, Traversable<HyperLink> todo) {
+        return traverser.depthFirstPostOrder(todo);
+      }
+    };
+
+    abstract Iterable<HyperLink> traverse(Traverser<HyperLink> traverser, Traversable<HyperLink> todo);
+  }
+
   @AllArgsConstructor
   @NoArgsConstructor
   @ToString
@@ -53,9 +76,13 @@ public class JCrawler {
           .map(z -> SimpleUrl.from(z.link).withoutQuery().toExternalForm())
           .toSet());
       Seq<String> start = webLocation.ls().map(x -> x.asHttpClientLocation().toExternalForm()).toList();
-      return new CrawlConfig(start, cache, webLocation, start.toSet(), includeQuery, whitelist, -1, -1, null);
+      return new CrawlConfig(TraversalType.BREADTH_FIRST, start, cache, webLocation, start.toSet(), includeQuery,
+        whitelist,
+        -1, -1, null);
     }
 
+    /**Breadth first is usual.*/
+    public TraversalType traversalType = TraversalType.BREADTH_FIRST;
     public Seq<String> start;
     public DirLocation cache;
     public WebLocation webLocation;
@@ -112,9 +139,10 @@ public class JCrawler {
     this.client = new WebClientFactory(config.protocols);
   }
 
+  //TODO bug in guava traversal that checks all initial links twice
   private RichIterable<String> crawl(Traversable<HyperLink> todo) {
-    Iterable<HyperLink> traverser = Traverser.forGraph(this::downloadAndExtractLinks)
-      .breadthFirst(todo);
+    Iterable<HyperLink> traverser = config.traversalType.traverse(
+      Traverser.forGraph(this::downloadAndExtractLinks), todo);
     return RichIterable.ofAll(traverser).map(x -> x.link).take(config.maxDocs);
   }
   //

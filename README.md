@@ -2,13 +2,15 @@
 Crawiling in java 
 
 ## Features
-
+- crawler
 - [ ] scraping
   - [ ] jsoup convert
   [ ] crawling
   - [x] option to remove query params when searching for new links
   - [x] whitelist from other html
-  - [ ] breadth search - now is recurisve depth search
+  - [x] strategies - guava traversers
+    - [x] depth first
+    - [x] breadth first
   - [ ] max parallel threads
   - [ ] max calls/second
   - [ ] link seeders/generators
