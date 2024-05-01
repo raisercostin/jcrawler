@@ -276,6 +276,7 @@
     <dependency>
       <groupId>com.google.guava</groupId>
       <artifactId>guava</artifactId>
+      <version>33.1.0-jre</version>
     </dependency>
     <dependency>
       <groupId>com.mashape.unirest</groupId>
@@ -390,8 +391,8 @@
         <artifactId>maven-compiler-plugin</artifactId>
         <!--$NO-MVN-MAN-VER$ -->
         <configuration>
-          <source>${source.java.version}</source>
-          <target>${target.java.version}</target>
+          <source>${myJavaVersion}</source>
+          <target>${myJavaVersion}</target>
           <showWarnings>true</showWarnings>
           <showDeprecation>true</showDeprecation>
           <annotationProcessorPaths>

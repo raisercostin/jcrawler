@@ -1,6 +1,9 @@
 package org.raisercostin.jcrawl;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import io.vavr.control.Option;
+import org.jedio.struct.RichIterable;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.raisercostin.jcrawl.JCrawler.CrawlConfig;
@@ -46,13 +49,13 @@ class JCrawlerTest {
   void testLege() {
     //    WebClientLocation2.defaultClient.webclientWireTap.enable();
     //    WebClientLocation2.defaultClient.webclientWireTapType.setRuntimeValue(AdvancedByteBufFormat.HEX_DUMP);
-    //TODO - strategies: depth first, breadth first
-    //TODO add parallelism
+    //TODO - strategies: depth first, breadth first - guava traversers
+    //TODO add parallelism - ParallelTraverser?
     //TODO use different httpclients
     //TODO use native java httpclient
     //TODO use virtualThreads
     //TODO rename to RateLimitingDownloader
-    JCrawler.crawl(
+    RichIterable<String> all = JCrawler.crawl(
       CrawlConfig
         .start("https://legislatie.just.ro/Public/DetaliiDocument/1")
         .withCache(Locations.dir("d:\\home\\raiser\\work\\_var_namek_jcrawl\\scan4-just").mkdirIfNeeded())
@@ -65,5 +68,13 @@ class JCrawlerTest {
         .withProtocol(HttpProtocol.HTTP11)
     //
     );
+
+    assertThat(all.mkString("\n")).isEqualTo(
+      """
+          https://legislatie.just.ro/Public/DetaliiDocument/1
+          https://legislatie.just.ro/Public/DetaliiDocument/131185
+          https://legislatie.just.ro/Public/DetaliiDocument/79643
+          https://legislatie.just.ro/Public/DetaliiDocument/31989
+          https://legislatie.just.ro/Public/DetaliiDocument/26296""");
   }
 }

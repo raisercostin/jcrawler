@@ -4,6 +4,7 @@ import java.util.concurrent.Semaphore;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.google.common.graph.Traverser;
 import io.vavr.API;
 import io.vavr.collection.Iterator;
 import io.vavr.collection.List;
@@ -17,6 +18,7 @@ import lombok.ToString;
 import lombok.With;
 import lombok.val;
 import lombok.extern.slf4j.Slf4j;
+import org.jedio.struct.RichIterable;
 import org.raisercostin.jedio.DirLocation;
 import org.raisercostin.jedio.Locations;
 import org.raisercostin.jedio.ReadableFileLocation;
@@ -59,20 +61,20 @@ public class JCrawler {
     public WebLocation webLocation;
     public Set<String> children;
     public boolean includeQuery;
-    public Option<Set<String>> whitelist;
+    public Option<Set<String>> exactMatch;
     public int maxDocs = -1;
     public int maxConnections = -1;
     public HttpProtocol[] protocols;
 
-    public boolean acceptCrawl(SimpleUrl link) {
-      if (whitelist == null || whitelist.isEmpty() || whitelist.get().isEmpty()) {
-        return true;
+    public boolean accept(SimpleUrl link) {
+      if (exactMatch == null || exactMatch.isEmpty() || exactMatch.get().isEmpty()) {
+        return acceptStarts(link.toExternalForm());
       }
-      return whitelist.get().contains(link.toExternalForm());
+      String url = link.toExternalForm();
+      return exactMatch.get().contains(url) || acceptStarts(url);
     }
 
-    public boolean accept(SimpleUrl link) {
-      String url = link.toExternalForm();
+    public boolean acceptStarts(String url) {
       return children.exists(x -> url.startsWith(x));
     }
 
@@ -85,10 +87,9 @@ public class JCrawler {
     }
   }
 
-  public static void crawl(CrawlConfig config) {
-    Set<String> visited = API.Set();
+  public static RichIterable<String> crawl(CrawlConfig config) {
     JCrawler crawler = new JCrawler(config);
-    crawler.crawl(visited, config.start.map(x -> HyperLink.of(x)));
+    return crawler.crawl(config.start.map(x -> HyperLink.of(x)));
   }
 
   public static void crawl(WebLocation webLocation, Option<ReadableFileLocation> whitelistSample,
@@ -98,9 +99,8 @@ public class JCrawler {
     log.info("crawling [{}] to {}", webLocation, cache);
     Seq<String> files = config.start;
     files.forEach(System.out::println);
-    Set<String> visited = API.Set();
     JCrawler crawler = new JCrawler(config);
-    crawler.crawl(visited, files.map(url -> HyperLink.of(url)));
+    crawler.crawl(files.map(url -> HyperLink.of(url)));
   }
 
   public final CrawlConfig config;
@@ -112,38 +112,52 @@ public class JCrawler {
     this.client = new WebClientFactory(config.protocols);
   }
 
-  private Set<String> crawl(Set<String> visited2, Traversable<HyperLink> todo) {
-    return todo.foldLeft(visited2, (visited, link) -> {
-      SimpleUrl href = link.link(config.includeQuery);
-      if (config.maxDocs < 0 || visited.size() < config.maxDocs) {
-        if (!visited.contains(href.toExternalForm())) {
-          if (config.acceptCrawl(href)) {
-            SimpleUrl hyperLink = link.link(config.includeQuery);
-            if (config.accept(hyperLink)) {
-              Traversable<HyperLink> newTodo = downloadAndExtractLinks(hyperLink);
-              return crawl(visited.add(href.toExternalForm()), newTodo);
-            } else {
-              log.info("following not allowed for [{}]", link.link);
-              return visited;
-            }
-          } else {
-            log.info("ignored [{}]", link);
-            return visited;
-          }
-        } else {
-          log.info("already visited [{}]", link);
-          return visited;
-        }
-      } else {
-        log.debug("limit reached [{}]", link);
-        return visited;
-      }
-    });
+  private RichIterable<String> crawl(Traversable<HyperLink> todo) {
+    Iterable<HyperLink> traverser = Traverser.forGraph(this::downloadAndExtractLinks)
+      .breadthFirst(todo);
+    return RichIterable.ofAll(traverser).map(x -> x.link).take(config.maxDocs);
   }
+  //
+  //  private Set<CrawlNode> fetchLinks(CrawlNode link) {
+  //    SimpleUrl href = link.url.link(config.includeQuery);
+  //    //if (config.maxDocs < 0 || visited.size() < config.maxDocs) {
+  //    //    if (!visited.contains(href.toExternalForm())) {
+  //    //      if (config.accept(href)) {
+  //    Traversable<HyperLink> newTodo = downloadAndExtractLinks(href);
+  //    return crawl(visited.add(href.toExternalForm()), newTodo);
+  //  }else
+  //
+  //  {
+  //    log.info("following not allowed for [{}]", link.url.link);
+  //    return API.Set();//visited;
+  //  }
+  //  //    } else {
+  //  //      log.info("ignored [{}]", link);
+  //  //      return visited;
+  //  //    }
+  //  //    } else {
+  //  //      log.info("already visited [{}]", link);
+  //  //      return visited;
+  //  //    }
+  //  //    } else {
+  //  //      log.debug("limit reached [{}]", link);
+  //  //      return visited;
+  //  //    }
+  //
+  //  // Simulate fetching and parsing the URL to find linked URLs.
+  //  // This should be replaced with real HTTP fetching and HTML parsing logic.
+  //  //    return linksDiscovered.computeIfAbsent(url, this::simulateHttpFetch);
+  //  }
 
-  private Traversable<HyperLink> downloadAndExtractLinks(SimpleUrl link) {
+  private Traversable<HyperLink> downloadAndExtractLinks(HyperLink href) {
+    SimpleUrl link = href.link(config.includeQuery);
+    if (!config.accept(link)) {
+      log.info("ignored [{}]", href.link);
+      return Iterator.empty();
+    }
     try {
       semaphore.acquire();
+      log.info("start [{}]", href.link);
       RequestResponse content = client.get(link.toExternalForm()).readCompleteContentSync(null);
       WritableFileLocation dest = config.cache.child(slug(link)).asWritableFile();
       dest.write(content.getBody());
@@ -155,12 +169,15 @@ public class JCrawler {
       //            .copyDoNotOverwriteButIgnore()
       //            .withCopyMeta(true)
       //            .withDefaultReporting())
-      return extractLinks(dest, metaJson);
+      return extractLinks(dest, metaJson)
+        //Filter out self reference when traversing
+        .filter(x -> !x.link.equals(href.link));
     } catch (Exception e) {
       //TODO write in meta the error?
       log.error("couldn't extract links from {}", link, e);
       return Iterator.empty();
     } finally {
+      log.info("end [{}]", href.link);
       semaphore.release();
     }
   }
