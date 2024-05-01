@@ -58,7 +58,7 @@ class JCrawlerTest {
 
   @Test
   //@Disabled
-  void testLege() {
+  void testLegeBreadthFirst() {
     //    WebClientLocation2.defaultClient.webclientWireTap.enable();
     //    WebClientLocation2.defaultClient.webclientWireTapType.setRuntimeValue(AdvancedByteBufFormat.HEX_DUMP);
     //TODO add cache on disk - disk io is faster than network io
@@ -77,9 +77,9 @@ class JCrawlerTest {
       """
           https://legislatie.just.ro/Public/DetaliiDocument/1
           https://legislatie.just.ro/Public/DetaliiDocument/131185
-          https://legislatie.just.ro/Public/DetaliiDocument/79643
-          https://legislatie.just.ro/Public/DetaliiDocument/31989
-          https://legislatie.just.ro/Public/DetaliiDocument/26296""");
+          https://legislatie.just.ro/Public/DetaliiDocument/26296
+          https://legislatie.just.ro/Public/DetaliiDocumentAfis/131085
+          https://legislatie.just.ro/Public/DetaliiDocumentAfis/129268""");
   }
 
   @Test
@@ -97,6 +97,6 @@ class JCrawlerTest {
           https://legislatie.just.ro/Public/DetaliiDocument/131185
           https://legislatie.just.ro/Public/DetaliiDocument/132530
           https://legislatie.just.ro/Public/DetaliiDocument/131185
-          https://legislatie.just.ro/Public/DetaliiDocument/79643""");
+          https://legislatie.just.ro/Public/DetaliiDocument/26296""");
   }
 }

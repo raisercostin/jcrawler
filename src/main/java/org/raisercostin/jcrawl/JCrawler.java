@@ -196,7 +196,8 @@ public class JCrawler {
       //            .withDefaultReporting())
       return extractLinks(dest, metaJson)
         //Filter out self reference when traversing
-        .filter(x -> !x.externalForm.equals(href.externalForm));
+        .filter(x -> !x.externalForm.equals(href.externalForm))
+        .filter(config::accept);
     } catch (Exception e) {
       //TODO write in meta the error?
       log.error("couldn't extract links from {}", href.externalForm, e);
