@@ -1,5 +1,6 @@
 package org.raisercostin.jcrawl;
 
+import java.util.concurrent.Semaphore;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -23,7 +24,6 @@ import org.raisercostin.jedio.ReferenceLocation;
 import org.raisercostin.jedio.RelativeLocation;
 import org.raisercostin.jedio.WritableFileLocation;
 import org.raisercostin.jedio.url.SimpleUrl;
-import org.raisercostin.jedio.url.WebClientLocation2;
 import org.raisercostin.jedio.url.WebClientLocation2.RequestResponse;
 import org.raisercostin.jedio.url.WebClientLocation2.RequestResponse.Metadata;
 import org.raisercostin.jedio.url.WebClientLocation2.WebClientFactory;
@@ -31,7 +31,6 @@ import org.raisercostin.jedio.url.WebLocation;
 import org.raisercostin.nodes.Nodes;
 import org.springframework.http.MediaType;
 import reactor.netty.http.HttpProtocol;
-import reactor.netty.http.client.HttpClient;
 
 @Slf4j
 public class JCrawler {
@@ -52,7 +51,7 @@ public class JCrawler {
           .map(z -> SimpleUrl.from(z.link).withoutQuery().toExternalForm())
           .toSet());
       Seq<String> start = webLocation.ls().map(x -> x.asHttpClientLocation().toExternalForm()).toList();
-      return new CrawlConfig(start, cache, webLocation, start.toSet(), includeQuery, whitelist, -1, null);
+      return new CrawlConfig(start, cache, webLocation, start.toSet(), includeQuery, whitelist, -1, -1, null);
     }
 
     public Seq<String> start;
@@ -62,6 +61,7 @@ public class JCrawler {
     public boolean includeQuery;
     public Option<Set<String>> whitelist;
     public int maxDocs = -1;
+    public int maxConnections = -1;
     public HttpProtocol[] protocols;
 
     public boolean acceptCrawl(SimpleUrl link) {
@@ -76,7 +76,7 @@ public class JCrawler {
       return children.exists(x -> url.startsWith(x));
     }
 
-    public CrawlConfig withFilters(String... filters) {
+    public CrawlConfig withFiltersByPrefix(String... filters) {
       return withChildren(API.Set(filters));
     }
 
@@ -105,14 +105,13 @@ public class JCrawler {
 
   public final CrawlConfig config;
   public final WebClientFactory client;
+  public final Semaphore semaphore = new Semaphore(5);
 
   public JCrawler(CrawlConfig config) {
     this.config = config;
     this.client = new WebClientFactory(config.protocols);
   }
 
-  //TODO - breadth first
-  //depth first
   private Set<String> crawl(Set<String> visited2, Traversable<HyperLink> todo) {
     return todo.foldLeft(visited2, (visited, link) -> {
       SimpleUrl href = link.link(config.includeQuery);
@@ -144,6 +143,7 @@ public class JCrawler {
 
   private Traversable<HyperLink> downloadAndExtractLinks(SimpleUrl link) {
     try {
+      semaphore.acquire();
       RequestResponse content = client.get(link.toExternalForm()).readCompleteContentSync(null);
       WritableFileLocation dest = config.cache.child(slug(link)).asWritableFile();
       dest.write(content.getBody());
@@ -160,6 +160,8 @@ public class JCrawler {
       //TODO write in meta the error?
       log.error("couldn't extract links from {}", link, e);
       return Iterator.empty();
+    } finally {
+      semaphore.release();
     }
   }
 

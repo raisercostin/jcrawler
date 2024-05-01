@@ -46,19 +46,22 @@ class JCrawlerTest {
   void testLege() {
     //    WebClientLocation2.defaultClient.webclientWireTap.enable();
     //    WebClientLocation2.defaultClient.webclientWireTapType.setRuntimeValue(AdvancedByteBufFormat.HEX_DUMP);
+    //TODO - strategies: depth first, breadth first
+    //TODO add parallelism
     //TODO use different httpclients
     //TODO use native java httpclient
     //TODO use virtualThreads
-    //TODO parallelism:5
     //TODO rename to RateLimitingDownloader
     JCrawler.crawl(
       CrawlConfig
         .start("https://legislatie.just.ro/Public/DetaliiDocument/1")
         .withCache(Locations.dir("d:\\home\\raiser\\work\\_var_namek_jcrawl\\scan4-just").mkdirIfNeeded())
-        .withFilters("https://legislatie.just.ro/Public/DetaliiDocument/1",
+        .withFiltersByPrefix(
+          "https://legislatie.just.ro/Public/DetaliiDocument/1",
           "https://legislatie.just.ro/Public/DetaliiDocumentAfis/1",
           "https://legislatie.just.ro/Public/DetaliiDocument/2")
         .withMaxDocs(5)
+        .withMaxConnections(5)
         .withProtocol(HttpProtocol.HTTP11)
     //
     );
