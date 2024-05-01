@@ -25,7 +25,6 @@ import org.raisercostin.jedio.ReadableFileLocation;
 import org.raisercostin.jedio.ReferenceLocation;
 import org.raisercostin.jedio.RelativeLocation;
 import org.raisercostin.jedio.WritableFileLocation;
-import org.raisercostin.jedio.url.SimpleUrl;
 import org.raisercostin.jedio.url.WebClientLocation2.RequestResponse;
 import org.raisercostin.jedio.url.WebClientLocation2.RequestResponse.Metadata;
 import org.raisercostin.jedio.url.WebClientLocation2.WebClientFactory;
@@ -73,7 +72,7 @@ public class JCrawler {
       boolean includeQuery = false;
       Option<Set<String>> whitelist = whitelistSample
         .map(x -> extractLinksFromContent(x.readContent(), null, null)
-          .map(z -> SimpleUrl.from(z.link).withoutQuery().toExternalForm())
+          .map(z -> z.withoutQuery())
           .toSet());
       Seq<String> start = webLocation.ls().map(x -> x.asHttpClientLocation().toExternalForm()).toList();
       return new CrawlConfig(TraversalType.BREADTH_FIRST, start, cache, webLocation, start.toSet(), includeQuery,
@@ -93,12 +92,11 @@ public class JCrawler {
     public int maxConnections = -1;
     public HttpProtocol[] protocols;
 
-    public boolean accept(SimpleUrl link) {
+    public boolean accept(HyperLink link) {
       if (exactMatch == null || exactMatch.isEmpty() || exactMatch.get().isEmpty()) {
-        return acceptStarts(link.toExternalForm());
+        return acceptStarts(link.externalForm);
       }
-      String url = link.toExternalForm();
-      return exactMatch.get().contains(url) || acceptStarts(url);
+      return exactMatch.get().contains(link.externalForm) || acceptStarts(link.externalForm);
     }
 
     public boolean acceptStarts(String url) {
@@ -143,7 +141,7 @@ public class JCrawler {
   private RichIterable<String> crawl(Traversable<HyperLink> todo) {
     Iterable<HyperLink> traverser = config.traversalType.traverse(
       Traverser.forGraph(this::downloadAndExtractLinks), todo);
-    return RichIterable.ofAll(traverser).map(x -> x.link).take(config.maxDocs);
+    return RichIterable.ofAll(traverser).map(x -> x.externalForm).take(config.maxDocs);
   }
   //
   //  private Set<CrawlNode> fetchLinks(CrawlNode link) {
@@ -178,16 +176,15 @@ public class JCrawler {
   //  }
 
   private Traversable<HyperLink> downloadAndExtractLinks(HyperLink href) {
-    SimpleUrl link = href.link(config.includeQuery);
-    if (!config.accept(link)) {
-      log.info("ignored [{}]", href.link);
+    if (!config.accept(href)) {
+      log.info("ignored [{}]", href.externalForm);
       return Iterator.empty();
     }
     try {
       semaphore.acquire();
-      log.info("start [{}]", href.link);
-      RequestResponse content = client.get(link.toExternalForm()).readCompleteContentSync(null);
-      WritableFileLocation dest = config.cache.child(slug(link)).asWritableFile();
+      log.info("start [{}]", href.externalForm);
+      RequestResponse content = client.get(href.externalForm).readCompleteContentSync(null);
+      WritableFileLocation dest = config.cache.child(slug(href)).asWritableFile();
       dest.write(content.getBody());
       ReferenceLocation metaJson = dest.meta("", ".meta.json");
       metaJson.asPathLocation().write(content.computeMetadata());
@@ -199,13 +196,13 @@ public class JCrawler {
       //            .withDefaultReporting())
       return extractLinks(dest, metaJson)
         //Filter out self reference when traversing
-        .filter(x -> !x.link.equals(href.link));
+        .filter(x -> !x.externalForm.equals(href.externalForm));
     } catch (Exception e) {
       //TODO write in meta the error?
-      log.error("couldn't extract links from {}", link, e);
+      log.error("couldn't extract links from {}", href.externalForm, e);
       return Iterator.empty();
     } finally {
-      log.info("end [{}]", href.link);
+      log.info("end [{}]", href.externalForm);
       semaphore.release();
     }
   }
@@ -274,8 +271,8 @@ public class JCrawler {
     return result;
   }
 
-  private static RelativeLocation slug(SimpleUrl file) {
-    return slug(file.toExternalForm());
+  private static RelativeLocation slug(HyperLink file) {
+    return slug(file.externalForm);
   }
 
   private static RelativeLocation slug(String url) {

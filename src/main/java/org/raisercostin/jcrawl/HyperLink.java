@@ -36,7 +36,7 @@ public class HyperLink {
     return new HyperLink(url, relativeOrAbsoluteHyperlink, text, anchor, all, sourceHyperlink, sourceLocal);
   }
 
-  String link;
+  String externalForm;
   String relativeOrAbsoluteHyperlink;
   @ToString.Exclude
   String text;
@@ -52,6 +52,10 @@ public class HyperLink {
   }
 
   public SimpleUrl link(boolean keepQuery) {
-    return SimpleUrl.from(link, keepQuery);
+    return SimpleUrl.from(externalForm, keepQuery);
+  }
+
+  public String withoutQuery() {
+    return SimpleUrl.from(externalForm).withoutQuery().toExternalForm();
   }
 }
