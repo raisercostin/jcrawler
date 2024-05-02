@@ -50,7 +50,7 @@ class JCrawlerTest {
       "https://legislatie.just.ro/Public/DetaliiDocument/2")
     .withCacheExpiryDuration(Duration.ofDays(100))
     .withMaxDocs(5)
-    .withMaxConnections(5)
+    .withMaxConnections(3)
     .withProtocol(HttpProtocol.HTTP11);
 
   @Test
@@ -65,19 +65,20 @@ class JCrawlerTest {
     //TODO rename to RateLimitingDownloader
     RichIterable<String> all = JCrawler.crawl(
       config
-        .withMaxConnections(5)
+        .withMaxConnections(3)
         .withCacheExpiryDuration(Duration.ofSeconds(1))
-        .withTraversalType(TraversalType.BREADTH_FIRST)
+        .withTraversalType(TraversalType.PARALLEL_BREADTH_FIRST)
     //
     );
 
-    assertThat(all.mkString("\n")).isEqualTo(
+    String actual = all.sorted().mkString("\n");
+    assertThat(actual).isEqualTo(
       """
           https://legislatie.just.ro/Public/DetaliiDocument/1
           https://legislatie.just.ro/Public/DetaliiDocument/131185
           https://legislatie.just.ro/Public/DetaliiDocument/26296
-          https://legislatie.just.ro/Public/DetaliiDocumentAfis/131085
-          https://legislatie.just.ro/Public/DetaliiDocumentAfis/129268""");
+          https://legislatie.just.ro/Public/DetaliiDocumentAfis/129268
+          https://legislatie.just.ro/Public/DetaliiDocumentAfis/131085""");
   }
 
   @Test

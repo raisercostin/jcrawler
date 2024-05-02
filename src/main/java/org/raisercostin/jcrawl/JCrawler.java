@@ -3,6 +3,7 @@ package org.raisercostin.jcrawl;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.TemporalAmount;
+import java.util.Iterator;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Semaphore;
@@ -10,6 +11,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.google.common.graph.SuccessorsFunction;
 import com.google.common.graph.Traverser;
 import io.vavr.API;
 import io.vavr.collection.List;
@@ -42,26 +44,32 @@ import reactor.netty.http.HttpProtocol;
 @Slf4j
 public class JCrawler {
   public enum TraversalType {
+    PARALLEL_BREADTH_FIRST {
+      @Override
+      public <N> Iterable<N> traverse(CrawlConfig config, Iterable<N> todo, SuccessorsFunction<N> successor) {
+        return new ParallelGraphTraverser<>(config.maxConnections, successor).startTraversal(todo, config.maxDocs);
+      }
+    },
     BREADTH_FIRST {
       @Override
-      Iterable<HyperLink> traverse(Traverser<HyperLink> traverser, Traversable<HyperLink> todo) {
-        return traverser.breadthFirst(todo);
+      public <N> Iterable<N> traverse(CrawlConfig config, Iterable<N> todo, SuccessorsFunction<N> successor) {
+        return Traverser.forGraph(successor).breadthFirst(todo);
       }
     },
     DEPTH_FIRST_PREORDER {
       @Override
-      Iterable<HyperLink> traverse(Traverser<HyperLink> traverser, Traversable<HyperLink> todo) {
-        return traverser.depthFirstPreOrder(todo);
+      public <N> Iterable<N> traverse(CrawlConfig config, Iterable<N> todo, SuccessorsFunction<N> successor) {
+        return Traverser.forGraph(successor).depthFirstPreOrder(todo);
       }
     },
     DEPTH_FIRST_POSTORDER {
       @Override
-      Iterable<HyperLink> traverse(Traverser<HyperLink> traverser, Traversable<HyperLink> todo) {
-        return traverser.depthFirstPostOrder(todo);
+      public <N> Iterable<N> traverse(CrawlConfig config, Iterable<N> todo, SuccessorsFunction<N> successor) {
+        return Traverser.forGraph(successor).depthFirstPostOrder(todo);
       }
     };
 
-    abstract Iterable<HyperLink> traverse(Traverser<HyperLink> traverser, Traversable<HyperLink> todo);
+    abstract <N> Iterable<N> traverse(CrawlConfig config, Iterable<N> todo, SuccessorsFunction<N> successor);
   }
 
   @AllArgsConstructor
@@ -160,54 +168,10 @@ public class JCrawler {
 
   //TODO bug in guava traversal that checks all initial links twice
   private RichIterable<String> crawl(Traversable<HyperLink> todo) {
-    //Traverser<HyperLink> traverser = Traverser.forGraph(this::downloadAndExtractLinks);
-    //Traverser2<HyperLink> traverser2 = Traverser2.forGraph(this::downloadAndExtractLinks);
-    //Iterable<HyperLink> traverser2 = config.traversalType.traverse(traverser, todo);
-    //Iterable<HyperLink> traverser2 = parallelBreadthFirst(todo);
-    //todo.toJavaParallelStream()
-    //Iterable<HyperLink> all = traverser2.breadthFirst(todo);
-
-    //TODO analyze if the semaphore is still needed with parallel graph traverser
-    Iterable<HyperLink> all = new ParallelGraphTraverser<>(config.maxConnections, this::downloadAndExtractLinks)
-      .startTraversal(todo.head());
+    Iterable<HyperLink> all = config.traversalType.traverse(config, todo.iterator(), this::downloadAndExtractLinks);
+    //TODO analyze if the semaphore/tokenQueue is still needed with parallel graph traverser
     return RichIterable.ofAll(all).map(x -> x.externalForm).take(config.maxDocs);
   }
-
-  private Iterable<HyperLink> parallelBreadthFirst(Traversable<HyperLink> todo) {
-    throw new RuntimeException("Not implemented yet!!!");
-  }
-
-  //
-  //  private Set<CrawlNode> fetchLinks(CrawlNode link) {
-  //    SimpleUrl href = link.url.link(config.includeQuery);
-  //    //if (config.maxDocs < 0 || visited.size() < config.maxDocs) {
-  //    //    if (!visited.contains(href.toExternalForm())) {
-  //    //      if (config.accept(href)) {
-  //    Traversable<HyperLink> newTodo = downloadAndExtractLinks(href);
-  //    return crawl(visited.add(href.toExternalForm()), newTodo);
-  //  }else
-  //
-  //  {
-  //    log.info("following not allowed for [{}]", link.url.link);
-  //    return API.Set();//visited;
-  //  }
-  //  //    } else {
-  //  //      log.info("ignored [{}]", link);
-  //  //      return visited;
-  //  //    }
-  //  //    } else {
-  //  //      log.info("already visited [{}]", link);
-  //  //      return visited;
-  //  //    }
-  //  //    } else {
-  //  //      log.debug("limit reached [{}]", link);
-  //  //      return visited;
-  //  //    }
-  //
-  //  // Simulate fetching and parsing the URL to find linked URLs.
-  //  // This should be replaced with real HTTP fetching and HTML parsing logic.
-  //  //    return linksDiscovered.computeIfAbsent(url, this::simulateHttpFetch);
-  //  }
 
   private Traversable<HyperLink> downloadAndExtractLinks(HyperLink href) {
     if (!config.accept(href)) {
@@ -222,25 +186,20 @@ public class JCrawler {
       boolean forcedDownload = exists && config.forceDownload(href, dest);
       ReferenceLocation metaJson = dest.meta("", ".meta.json");
       if (!exists || forcedDownload) {
+        String token = tokenQueue.take();
+        //semaphore.acquire();
+        //int available = counter.incrementAndGet();
         try {
-          String token = tokenQueue.take();
-          //semaphore.acquire();
-          //int available = counter.incrementAndGet();
-          try {
-            log.info("download from url #{} [{}]", token, href.externalForm);
-            RequestResponse content = client.get(href.externalForm).readCompleteContentSync(null);
-            String body = content.getBody();
-            dest.write(body);
-            Metadata metadata = content.getMetadata();
-            metaJson.asPathLocation().write(content.computeMetadata(metadata));
-            links = extractLinksInMemory(body, dest, metadata);
-          } finally {
-            log.info("download from url #{} done [{}]", token, href.externalForm);
-            tokenQueue.put(token);
-          }
+          log.info("download from url #{} [{}]", token, href.externalForm);
+          RequestResponse content = client.get(href.externalForm).readCompleteContentSync(null);
+          String body = content.getBody();
+          dest.write(body);
+          Metadata metadata = content.getMetadata();
+          metaJson.asPathLocation().write(content.computeMetadata(metadata));
+          links = extractLinksInMemory(body, dest, metadata);
         } finally {
-          //counter.decrementAndGet();
-          //semaphore.release();
+          log.info("download from url #{} done [{}]", token, href.externalForm);
+          tokenQueue.put(token);
         }
       } else {
         try {
