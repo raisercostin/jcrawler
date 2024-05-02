@@ -1,25 +1,14 @@
 package org.raisercostin.jcrawl;
 
-import static com.google.common.base.Preconditions.checkNotNull;
-import static java.util.Objects.requireNonNull;
-
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.TemporalAmount;
-import java.util.ArrayDeque;
-import java.util.Deque;
-import java.util.HashSet;
-import java.util.Iterator;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import javax.annotation.CheckForNull;
-
-import com.google.common.collect.AbstractIterator;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.graph.SuccessorsFunction;
 import com.google.common.graph.Traverser;
 import io.vavr.API;
 import io.vavr.collection.List;
@@ -29,7 +18,6 @@ import io.vavr.collection.Traversable;
 import io.vavr.control.Option;
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
-import lombok.RequiredArgsConstructor;
 import lombok.ToString;
 import lombok.With;
 import lombok.extern.slf4j.Slf4j;
@@ -156,11 +144,18 @@ public class JCrawler {
   public final WebClientFactory client;
   public final Semaphore semaphore;
   public final AtomicInteger counter = new AtomicInteger(0);
+  public final ArrayBlockingQueue<String> tokenQueue;
 
   public JCrawler(CrawlConfig config) {
     this.config = config;
     this.client = new WebClientFactory(config.protocols);
     this.semaphore = new Semaphore(config.maxConnections);
+    this.tokenQueue = new ArrayBlockingQueue<>(config.maxConnections);
+
+    //Populate the queue with tokens
+    for (int i = 0; i < config.maxConnections; i++) {
+      tokenQueue.add("c" + i);
+    }
   }
 
   //TODO bug in guava traversal that checks all initial links twice
@@ -228,10 +223,11 @@ public class JCrawler {
       ReferenceLocation metaJson = dest.meta("", ".meta.json");
       if (!exists || forcedDownload) {
         try {
-          semaphore.acquire();
-          int available = counter.incrementAndGet();
+          String token = tokenQueue.take();
+          //semaphore.acquire();
+          //int available = counter.incrementAndGet();
           try {
-            log.info("download from url #{} [{}]", available, href.externalForm);
+            log.info("download from url #{} [{}]", token, href.externalForm);
             RequestResponse content = client.get(href.externalForm).readCompleteContentSync(null);
             String body = content.getBody();
             dest.write(body);
@@ -239,11 +235,12 @@ public class JCrawler {
             metaJson.asPathLocation().write(content.computeMetadata(metadata));
             links = extractLinksInMemory(body, dest, metadata);
           } finally {
-            log.info("download from url #{} done [{}]", available, href.externalForm);
+            log.info("download from url #{} done [{}]", token, href.externalForm);
+            tokenQueue.put(token);
           }
         } finally {
-          counter.decrementAndGet();
-          semaphore.release();
+          //counter.decrementAndGet();
+          //semaphore.release();
         }
       } else {
         try {

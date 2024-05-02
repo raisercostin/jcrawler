@@ -65,7 +65,7 @@ class JCrawlerTest {
     //TODO rename to RateLimitingDownloader
     RichIterable<String> all = JCrawler.crawl(
       config
-        .withMaxConnections(2)
+        .withMaxConnections(5)
         .withCacheExpiryDuration(Duration.ofSeconds(1))
         .withTraversalType(TraversalType.BREADTH_FIRST)
     //
