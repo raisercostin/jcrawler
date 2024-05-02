@@ -58,15 +58,16 @@ class JCrawlerTest {
   void testLegeBreadthFirst() {
     //    WebClientLocation2.defaultClient.webclientWireTap.enable();
     //    WebClientLocation2.defaultClient.webclientWireTapType.setRuntimeValue(AdvancedByteBufFormat.HEX_DUMP);
-    //TODO add parallelism - ParallelTraverser?
+    //TODO add url generators beside scraping?
     //TODO use different httpclients
     //TODO use native java httpclient
     //TODO use virtualThreads
     //TODO rename to RateLimitingDownloader
     RichIterable<String> all = JCrawler.crawl(
       config
+        //.withMaxDocs(1000)
         .withMaxConnections(3)
-        .withCacheExpiryDuration(Duration.ofSeconds(1))
+        //.withCacheExpiryDuration(Duration.ofSeconds(1))
         .withTraversalType(TraversalType.PARALLEL_BREADTH_FIRST)
     //
     );

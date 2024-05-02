@@ -88,7 +88,7 @@ public class ParallelGraphTraverser<N> {
         } catch (InterruptedException e) {
           log.debug("Interrupted during shutdown.", e);
         } finally {
-          log.debug("Finished worker {} visited={} consumed={} maxDocs={}", locali, visited.size(),
+          log.info("Finished worker {} visited={} consumed={} maxDocs={}", locali, visited.size(),
             visitedCounter.get(), maxDocs);
         }
       });

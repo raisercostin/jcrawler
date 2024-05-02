@@ -92,7 +92,7 @@ public class JCrawler {
       return new CrawlConfig(TraversalType.BREADTH_FIRST, Nodes.json, start, cache, webLocation, start.toSet(),
         includeQuery,
         whitelist,
-        -1, -1, null, Duration.ofDays(100));
+        -1, 3, null, Duration.ofDays(100));
     }
 
     /**Breadth first is usual.*/
@@ -105,7 +105,7 @@ public class JCrawler {
     public boolean includeQuery;
     public Option<Set<String>> exactMatch;
     public int maxDocs = -1;
-    public int maxConnections = -1;
+    public int maxConnections = 3;
     public HttpProtocol[] protocols;
     public TemporalAmount cacheExpiryDuration = Duration.ofDays(100);
 
