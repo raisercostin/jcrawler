@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.TemporalAmount;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
@@ -142,14 +143,13 @@ public class JCrawler {
 
   public final CrawlConfig config;
   public final WebClientFactory client;
-  public final Semaphore semaphore;
-  public final AtomicInteger counter = new AtomicInteger(0);
-  public final ArrayBlockingQueue<String> tokenQueue;
+  //public final java.util.concurrent.Semaphore semaphore;
+  public final BlockingQueue<String> tokenQueue;
 
   public JCrawler(CrawlConfig config) {
     this.config = config;
     this.client = new WebClientFactory(config.protocols);
-    this.semaphore = new Semaphore(config.maxConnections);
+    //this.semaphore = new Semaphore(config.maxConnections);
     this.tokenQueue = new ArrayBlockingQueue<>(config.maxConnections);
 
     //Populate the queue with tokens
