@@ -6,18 +6,12 @@ import java.time.Duration;
 
 import io.vavr.control.Option;
 import org.jedio.struct.RichIterable;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.raisercostin.jcrawl.JCrawler.CrawlConfig;
 import org.raisercostin.jcrawl.JCrawler.TraversalType;
 import org.raisercostin.jedio.Locations;
-import org.raisercostin.jedio.url.WebClientLocation2;
-import org.raisercostin.jedio.url.WebClientLocation2.WebClientFactory;
 import org.raisercostin.jscraper.JScraper;
-import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import reactor.netty.http.HttpProtocol;
-import reactor.netty.http.client.HttpClient;
-import reactor.netty.transport.logging.AdvancedByteBufFormat;
 
 class JCrawlerTest {
   @Test
@@ -71,6 +65,8 @@ class JCrawlerTest {
     //TODO rename to RateLimitingDownloader
     RichIterable<String> all = JCrawler.crawl(
       config
+        .withMaxConnections(2)
+        .withCacheExpiryDuration(Duration.ofSeconds(1))
         .withTraversalType(TraversalType.BREADTH_FIRST)
     //
     );

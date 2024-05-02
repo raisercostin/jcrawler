@@ -1,18 +1,27 @@
 package org.raisercostin.jcrawl;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
+
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.TemporalAmount;
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.databind.cfg.MapperBuilder;
-import com.fasterxml.jackson.dataformat.yaml.YAMLMapper;
+import javax.annotation.CheckForNull;
+
+import com.google.common.collect.AbstractIterator;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.graph.SuccessorsFunction;
 import com.google.common.graph.Traverser;
 import io.vavr.API;
-import io.vavr.collection.Iterator;
 import io.vavr.collection.List;
 import io.vavr.collection.Seq;
 import io.vavr.collection.Set;
@@ -20,9 +29,9 @@ import io.vavr.collection.Traversable;
 import io.vavr.control.Option;
 import lombok.AllArgsConstructor;
 import lombok.NoArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import lombok.ToString;
 import lombok.With;
-import lombok.val;
 import lombok.extern.slf4j.Slf4j;
 import org.checkerframework.checker.nullness.qual.NonNull;
 import org.jedio.struct.RichIterable;
@@ -38,7 +47,6 @@ import org.raisercostin.jedio.url.WebClientLocation2.WebClientFactory;
 import org.raisercostin.jedio.url.WebLocation;
 import org.raisercostin.nodes.JacksonNodes;
 import org.raisercostin.nodes.Nodes;
-import org.raisercostin.nodes.impl.JsonNodes;
 import org.springframework.http.MediaType;
 import reactor.netty.http.HttpProtocol;
 
@@ -146,19 +154,34 @@ public class JCrawler {
 
   public final CrawlConfig config;
   public final WebClientFactory client;
-  public final Semaphore semaphore = new Semaphore(5);
+  public final Semaphore semaphore;
+  public final AtomicInteger counter = new AtomicInteger(0);
 
   public JCrawler(CrawlConfig config) {
     this.config = config;
     this.client = new WebClientFactory(config.protocols);
+    this.semaphore = new Semaphore(config.maxConnections);
   }
 
   //TODO bug in guava traversal that checks all initial links twice
   private RichIterable<String> crawl(Traversable<HyperLink> todo) {
-    Iterable<HyperLink> traverser = config.traversalType.traverse(
-      Traverser.forGraph(this::downloadAndExtractLinks), todo);
-    return RichIterable.ofAll(traverser).map(x -> x.externalForm).take(config.maxDocs);
+    //Traverser<HyperLink> traverser = Traverser.forGraph(this::downloadAndExtractLinks);
+    //Traverser2<HyperLink> traverser2 = Traverser2.forGraph(this::downloadAndExtractLinks);
+    //Iterable<HyperLink> traverser2 = config.traversalType.traverse(traverser, todo);
+    //Iterable<HyperLink> traverser2 = parallelBreadthFirst(todo);
+    //todo.toJavaParallelStream()
+    //Iterable<HyperLink> all = traverser2.breadthFirst(todo);
+
+    //TODO analyze if the semaphore is still needed with parallel graph traverser
+    Iterable<HyperLink> all = new ParallelGraphTraverser<>(config.maxConnections, this::downloadAndExtractLinks)
+      .startTraversal(todo.head());
+    return RichIterable.ofAll(all).map(x -> x.externalForm).take(config.maxDocs);
   }
+
+  private Iterable<HyperLink> parallelBreadthFirst(Traversable<HyperLink> todo) {
+    throw new RuntimeException("Not implemented yet!!!");
+  }
+
   //
   //  private Set<CrawlNode> fetchLinks(CrawlNode link) {
   //    SimpleUrl href = link.url.link(config.includeQuery);
@@ -194,7 +217,7 @@ public class JCrawler {
   private Traversable<HyperLink> downloadAndExtractLinks(HyperLink href) {
     if (!config.accept(href)) {
       log.info("ignored [{}]", href.externalForm);
-      return Iterator.empty();
+      return io.vavr.collection.Iterator.empty();
     }
     try {
       WritableFileLocation dest = config.cache.child(slug(href)).asWritableFile();
@@ -206,15 +229,20 @@ public class JCrawler {
       if (!exists || forcedDownload) {
         try {
           semaphore.acquire();
-          log.info("download from url [{}]", href.externalForm);
-          RequestResponse content = client.get(href.externalForm).readCompleteContentSync(null);
-          String body = content.getBody();
-          dest.write(body);
-          Metadata metadata = content.getMetadata();
-          metaJson.asPathLocation().write(content.computeMetadata());
-          links = extractLinksInMemory(body, dest, metadata);
+          int available = counter.incrementAndGet();
+          try {
+            log.info("download from url #{} [{}]", available, href.externalForm);
+            RequestResponse content = client.get(href.externalForm).readCompleteContentSync(null);
+            String body = content.getBody();
+            dest.write(body);
+            Metadata metadata = content.getMetadata();
+            metaJson.asPathLocation().write(content.computeMetadata(metadata));
+            links = extractLinksInMemory(body, dest, metadata);
+          } finally {
+            log.info("download from url #{} done [{}]", available, href.externalForm);
+          }
         } finally {
-          log.info("download from url done [{}]", href.externalForm);
+          counter.decrementAndGet();
           semaphore.release();
         }
       } else {
@@ -234,11 +262,15 @@ public class JCrawler {
       return links
         //Filter out self reference when traversing
         .filter(x -> !x.externalForm.equals(href.externalForm))
-        .filter(config::accept);
+        .filter(config::accept)
+        //return distinct externalForm - first
+        .iterator()
+        .groupBy(x -> x.externalForm)
+        .map(x -> x._2.head());
     } catch (Exception e) {
       //TODO write in meta the error?
       log.error("couldn't extract links from {}", href.externalForm, e);
-      return Iterator.empty();
+      return io.vavr.collection.Iterator.empty();
     }
   }
 
@@ -258,13 +290,13 @@ public class JCrawler {
     ReferenceLocation metaLinks = source.meta("", ".links.json");
     if (metaLinks.exists()) {
       try {
-        Iterator<@NonNull HyperLink> all = nodes.toIterator(metaLinks.asReadableFile().readContent(),
+        io.vavr.collection.Iterator<@NonNull HyperLink> all = nodes.toIterator(metaLinks.asReadableFile().readContent(),
           HyperLink.class);
         HyperLink firstElement = all.headOption().getOrNull();
 
         // Rebuild the iterator with the first element not consumed
-        Iterator<HyperLink> newIterator = firstElement != null
-            ? Iterator.concat(Iterator.of(firstElement), all)
+        io.vavr.collection.Iterator<HyperLink> newIterator = firstElement != null
+            ? io.vavr.collection.Iterator.concat(io.vavr.collection.Iterator.of(firstElement), all)
             : all;
         return newIterator;
       } catch (com.fasterxml.jackson.databind.RuntimeJsonMappingException e) {
@@ -281,8 +313,9 @@ public class JCrawler {
     log.info("searching links in [{}] from {}", meta.responseHeaders.getContentType(), source);
     String sourceUrl = meta.url;
     //String sourceUrl = meta2.httpMetaRequestUri().get();
-    Iterator<HyperLink> result = isHtmlAnd200 ? extractLinksFromContent(content, source.toExternalForm(), sourceUrl)
-        : Iterator.empty();
+    io.vavr.collection.Iterator<HyperLink> result = isHtmlAnd200
+        ? extractLinksFromContent(content, source.toExternalForm(), sourceUrl)
+        : io.vavr.collection.Iterator.empty();
     List<HyperLink> all = result.toList();
     int status = meta.statusCodeValue;
     if (300 <= status && status < 400 && meta.responseHeaders.getLocation() != null) {
@@ -310,10 +343,12 @@ public class JCrawler {
 
   private final static Seq<Pattern> allExp = API.Seq(exp("'"), exp("\\\""));
 
-  private static Iterator<HyperLink> extractLinksFromContent(final String content, String source, String sourceUrl) {
-    Iterator<HyperLink> result;
+  private static io.vavr.collection.Iterator<HyperLink> extractLinksFromContent(final String content, String source,
+      String sourceUrl) {
+    io.vavr.collection.Iterator<HyperLink> result;
     result = allExp.iterator().flatMap(exp -> {
-      Iterator<Matcher> all = Iterator.continually(exp.matcher(content)).takeWhile(matcher -> matcher.find());
+      io.vavr.collection.Iterator<Matcher> all = io.vavr.collection.Iterator.continually(exp.matcher(content))
+        .takeWhile(matcher -> matcher.find());
       return all.map(
         m -> HyperLink.of(m.group(1).trim(), m.group(3).trim(), m.group(2), m.group().trim(), sourceUrl,
           source));
