@@ -2,10 +2,7 @@
 Crawiling in java 
 
 ## Features
-- crawler
-- [ ] scraping
-  - [ ] jsoup convert
-  [ ] crawling
+- [x] crawler
   - [x] option to remove query params when searching for new links
   - [x] whitelist from other html
   - [x] strategies
@@ -29,11 +26,6 @@ Crawiling in java
   - [x] add cache on disk - disk io is faster than network io
     - [x] expiryDuration for now
     - [ ] could implement etag (so call OPTION first and not GET)
-  - [ ] do not overwrite on redownload but rename old version
-  - [ ] max calls/second
-  - [ ] link seeders/generators
-    - [ ] from google
-    - [ ] from patterns
   - [ ] link extractors
     - [x] html
     - [x] http header redirects: Location
@@ -49,6 +41,35 @@ Crawiling in java
     - [x] http meta
     - [x] hyperlinks meta file
     - [x] add pluggable config of meta 
+    
+
+## History
+- [x] 2024-05-06 - added generators like: https://legislatie.just.ro/Public/{DetaliiDocument|DetaliiDocumentAfis}/{1-3}
+  - Or between `{` abd `}` separated with `|`
+  - Range between `{` abd `}` separated with `-`
+  - Anything else is an and
+  - This will generate
+    ```
+    https://legislatie.just.ro/Public/DetaliiDocument/1
+    https://legislatie.just.ro/Public/DetaliiDocument/2
+    https://legislatie.just.ro/Public/DetaliiDocument/3
+    https://legislatie.just.ro/Public/DetaliiDocumentAfis/1
+    https://legislatie.just.ro/Public/DetaliiDocumentAfis/2
+    https://legislatie.just.ro/Public/DetaliiDocumentAfis/3
+    ```
+
+## TODO
+
+- [ ] add CLI
+- [ ] crawling
+  - [ ] do not overwrite on redownload but rename old version
+  - [ ] max calls/second
+  - [ ] link seeders/generators
+    - [ ] from google
+    - [ ] from patterns
+- [ ] scraping
+  - [ ] jsoup convert
+
 
 
 ## Competition
