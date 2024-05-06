@@ -3,11 +3,8 @@ package org.raisercostin.jcrawl;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.TemporalAmount;
-import java.util.Iterator;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -53,6 +50,7 @@ public class JCrawler {
     BREADTH_FIRST {
       @Override
       public <N> Iterable<N> traverse(CrawlConfig config, Iterable<N> todo, SuccessorsFunction<N> successor) {
+        //TODO bug in guava traversal that checks all initial links twice
         return Traverser.forGraph(successor).breadthFirst(todo);
       }
     },
@@ -92,7 +90,7 @@ public class JCrawler {
       return new CrawlConfig(TraversalType.BREADTH_FIRST, Nodes.json, start, cache, webLocation, start.toSet(),
         includeQuery,
         whitelist,
-        -1, 3, null, Duration.ofDays(100));
+        -1, 3, null, Duration.ofDays(100), null);
     }
 
     /**Breadth first is usual.*/
@@ -108,6 +106,7 @@ public class JCrawler {
     public int maxConnections = 3;
     public HttpProtocol[] protocols;
     public TemporalAmount cacheExpiryDuration = Duration.ofDays(100);
+    public String generator;
 
     public boolean accept(HyperLink link) {
       if (exactMatch == null || exactMatch.isEmpty() || exactMatch.get().isEmpty()) {
@@ -135,6 +134,9 @@ public class JCrawler {
 
   public static RichIterable<String> crawl(CrawlConfig config) {
     JCrawler crawler = new JCrawler(config);
+    if (config.generator != null) {
+      return crawler.crawl(Generators.parse(config.generator).generate().map(x -> HyperLink.of(x)));
+    }
     return crawler.crawl(config.start.map(x -> HyperLink.of(x)));
   }
 
@@ -166,10 +168,8 @@ public class JCrawler {
     }
   }
 
-  //TODO bug in guava traversal that checks all initial links twice
   private RichIterable<String> crawl(Traversable<HyperLink> todo) {
-    Iterable<HyperLink> all = config.traversalType.traverse(config, todo.iterator(), this::downloadAndExtractLinks);
-    //TODO analyze if the semaphore/tokenQueue is still needed with parallel graph traverser
+    Iterable<HyperLink> all = config.traversalType.traverse(config, todo, this::downloadAndExtractLinks);
     return RichIterable.ofAll(all).map(x -> x.externalForm).take(config.maxDocs);
   }
 

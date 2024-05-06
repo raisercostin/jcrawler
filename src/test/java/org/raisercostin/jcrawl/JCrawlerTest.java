@@ -45,9 +45,13 @@ class JCrawlerTest {
     .start("https://legislatie.just.ro/Public/DetaliiDocument/1")
     .withCache(Locations.dir("d:\\home\\raiser\\work\\_var_namek_jcrawl\\scan4-just").mkdirIfNeeded())
     .withFiltersByPrefix(
-      "https://legislatie.just.ro/Public/DetaliiDocument/1",
+      "https://legislatie.just.ro/Public/DetaliiDocumentAfis/",
+      //"https://legislatie.just.ro/Public/DetaliiDocument/1",
       "https://legislatie.just.ro/Public/DetaliiDocumentAfis/1",
-      "https://legislatie.just.ro/Public/DetaliiDocument/2")
+      //"https://legislatie.just.ro/Public/DetaliiDocument/2",
+      "https://legislatie.just.ro/Public/DetaliiDocumentAfis/2",
+      //"https://legislatie.just.ro/Public/DetaliiDocument/3",
+      "https://legislatie.just.ro/Public/DetaliiDocumentAfis/3")
     .withCacheExpiryDuration(Duration.ofDays(100))
     .withMaxDocs(5)
     .withMaxConnections(3)
@@ -65,10 +69,12 @@ class JCrawlerTest {
     //TODO rename to RateLimitingDownloader
     RichIterable<String> all = JCrawler.crawl(
       config
-        //.withMaxDocs(1000)
+        .withMaxDocs(1000)
         .withMaxConnections(3)
         //.withCacheExpiryDuration(Duration.ofSeconds(1))
         .withTraversalType(TraversalType.PARALLEL_BREADTH_FIRST)
+        //.withGenerator("https://legislatie.just.ro/Public/{DetaliiDocument|DetaliiDocumentAfis}/{1-3}")
+        .withGenerator("https://legislatie.just.ro/Public/DetaliiDocumentAfis/{1-1000}")
     //
     );
 
