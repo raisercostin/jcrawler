@@ -229,7 +229,11 @@ public class AnreSpotTest {
   }
 
   private String deduplicate2(String allContent) {
-    Yaml yaml = new Yaml(new Constructor(), new CustomRepresenter(), new DumperOptions());
+    DumperOptions options = new DumperOptions();
+    options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
+    options.setPrettyFlow(true);
+
+    Yaml yaml = new Yaml(new Constructor(), new CustomRepresenter(), options);
 
     Object data = yaml.load(allContent);
 
