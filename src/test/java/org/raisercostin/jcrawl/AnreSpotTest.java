@@ -257,10 +257,9 @@ public class AnreSpotTest {
         Object value = deduplicate(entry.getValue(), referenceMap, equalityMap);
         deduplicatedMap.put(key, value);
       }
-      AnchorNode anchorNode = new AnchorNode(deduplicatedMap, "id" + referenceMap.size());
-      equalityMap.put(map, anchorNode);
-      referenceMap.put(map, anchorNode);
-      return anchorNode;
+      equalityMap.put(map, deduplicatedMap);
+      referenceMap.put(map, deduplicatedMap);
+      return deduplicatedMap;
     } else if (data instanceof List) {
       List<Object> list = (List<Object>) data;
       for (Map.Entry<Object, Object> entry : equalityMap.entrySet()) {
@@ -272,10 +271,9 @@ public class AnreSpotTest {
       for (Object item : list) {
         deduplicatedList.add(deduplicate(item, referenceMap, equalityMap));
       }
-      AnchorNode anchorNode = new AnchorNode(deduplicatedList, "id" + referenceMap.size());
-      equalityMap.put(list, anchorNode);
-      referenceMap.put(list, anchorNode);
-      return anchorNode;
+      equalityMap.put(list, deduplicatedList);
+      referenceMap.put(list, deduplicatedList);
+      return deduplicatedList;
     } else {
       for (Object key : equalityMap.keySet()) {
         if (Objects.equals(data, key)) {
