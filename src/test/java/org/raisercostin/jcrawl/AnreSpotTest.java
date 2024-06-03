@@ -30,6 +30,7 @@ import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.Constructor;
 import org.yaml.snakeyaml.nodes.Node;
+import org.yaml.snakeyaml.representer.Represent;
 import org.yaml.snakeyaml.representer.Representer;
 
 public class AnreSpotTest {
@@ -252,9 +253,10 @@ public class AnreSpotTest {
         Object value = deduplicate(entry.getValue(), referenceMap, equalityMap);
         deduplicatedMap.put(key, value);
       }
-      equalityMap.put(map, deduplicatedMap);
-      referenceMap.put(map, deduplicatedMap);
-      return deduplicatedMap;
+      AnchorNode anchorNode = new AnchorNode(deduplicatedMap, "id" + referenceMap.size());
+      equalityMap.put(map, anchorNode);
+      referenceMap.put(map, anchorNode);
+      return anchorNode;
     } else if (data instanceof List) {
       List<Object> list = (List<Object>) data;
       for (Map.Entry<Object, Object> entry : equalityMap.entrySet()) {
@@ -266,9 +268,10 @@ public class AnreSpotTest {
       for (Object item : list) {
         deduplicatedList.add(deduplicate(item, referenceMap, equalityMap));
       }
-      equalityMap.put(list, deduplicatedList);
-      referenceMap.put(list, deduplicatedList);
-      return deduplicatedList;
+      AnchorNode anchorNode = new AnchorNode(deduplicatedList, "id" + referenceMap.size());
+      equalityMap.put(list, anchorNode);
+      referenceMap.put(list, anchorNode);
+      return anchorNode;
     } else {
       for (Object key : equalityMap.keySet()) {
         if (Objects.equals(data, key)) {
@@ -310,13 +313,13 @@ public class AnreSpotTest {
       this.representers.put(AnchorNode.class, new RepresentAnchorNode());
     }
 
-    private class RepresentAnchorNode extends RepresentMap {
+    private class RepresentAnchorNode implements Represent {
       @Override
       public Node representData(Object data) {
         AnchorNode node = (AnchorNode) data;
-        Node anchorNode = super.representData(node.getValue());
-        anchorNode.setAnchor(node.getAnchor());
-        return anchorNode;
+        Node valueNode = represent(node.getValue());
+        valueNode.setAnchor(node.getAnchor());
+        return valueNode;
       }
     }
   }
