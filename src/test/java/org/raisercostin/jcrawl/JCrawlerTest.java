@@ -7,8 +7,8 @@ import java.time.Duration;
 import io.vavr.control.Option;
 import org.jedio.struct.RichIterable;
 import org.junit.jupiter.api.Test;
-import org.raisercostin.jcrawl.JCrawler.CrawlConfig;
-import org.raisercostin.jcrawl.JCrawler.TraversalType;
+import org.raisercostin.jcrawl.JCrawler.Crawler;
+import org.raisercostin.jcrawl.JCrawler.Crawler.TraversalType;
 import org.raisercostin.jedio.Locations;
 import org.raisercostin.jscraper.JScraper;
 import reactor.netty.http.HttpProtocol;
@@ -41,7 +41,8 @@ class JCrawlerTest {
     JScraper.scrape(Locations.dir("d:\\home\\raiser\\work\\_var_namek_jcrawl\\scan3-restocracy").mkdirIfNeeded());
   }
 
-  CrawlConfig config = CrawlConfig
+  Crawler crawler = Crawler
+    .crawler()
     .start("https://legislatie.just.ro/Public/DetaliiDocument/1")
     .withCache(Locations.dir("d:\\home\\raiser\\work\\_var_namek_jcrawl\\scan4-just").mkdirIfNeeded())
     .withFiltersByPrefix(
@@ -67,16 +68,14 @@ class JCrawlerTest {
     //TODO use native java httpclient
     //TODO use virtualThreads
     //TODO rename to RateLimitingDownloader
-    RichIterable<String> all = JCrawler.crawl(
-      config
-        .withMaxDocs(1000)
-        .withMaxConnections(3)
-        //.withCacheExpiryDuration(Duration.ofSeconds(1))
-        .withTraversalType(TraversalType.PARALLEL_BREADTH_FIRST)
-        //.withGenerator("https://legislatie.just.ro/Public/{DetaliiDocument|DetaliiDocumentAfis}/{1-3}")
-        .withGenerator("https://legislatie.just.ro/Public/DetaliiDocumentAfis/{1-1000}")
-    //
-    );
+    RichIterable<String> all = crawler
+      .withMaxDocs(1005)
+      .withMaxConnections(3)
+      //.withCacheExpiryDuration(Duration.ofSeconds(1))
+      .withTraversalType(TraversalType.PARALLEL_BREADTH_FIRST)
+      //.withGenerator("https://legislatie.just.ro/Public/{DetaliiDocument|DetaliiDocumentAfis}/{1-3}")
+      .withGenerator("https://legislatie.just.ro/Public/DetaliiDocumentAfis/{1000-1010}")
+      .crawl();
 
     String actual = all.sorted().mkString("\n");
     assertThat(actual).isEqualTo(
@@ -91,11 +90,9 @@ class JCrawlerTest {
   @Test
   //@Disabled
   void testLegeDepthFirstPreorder() {
-    RichIterable<String> all = JCrawler.crawl(
-      config
-        .withTraversalType(TraversalType.DEPTH_FIRST_PREORDER)
-    //
-    );
+    RichIterable<String> all = crawler
+      .withTraversalType(TraversalType.DEPTH_FIRST_PREORDER)
+      .crawl();
 
     assertThat(all.mkString("\n")).isEqualTo(
       """
@@ -104,5 +101,17 @@ class JCrawlerTest {
           https://legislatie.just.ro/Public/DetaliiDocument/132530
           https://legislatie.just.ro/Public/DetaliiDocument/131185
           https://legislatie.just.ro/Public/DetaliiDocument/26296""");
+  }
+
+  @Test
+  void testMain() {
+    //JCrawler.mainOne("https://legislatie.just.ro/Public/DetaliiDocument/1 --debug --protocol=HTTP11");
+    JCrawler.mainOne("");
+  }
+
+  @Test
+  void testAdvisors() {
+    JCrawler.crawl(Locations.web("www.holisticadvisors.net/en"), Option.none(),
+      Locations.dir("d:\\home\\raiser\\work\\_var_namek_jcrawl\\scan5-advisors").mkdirIfNeeded());
   }
 }
