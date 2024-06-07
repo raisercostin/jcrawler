@@ -1,7 +1,9 @@
 # jcrawler
-Crawiling in java 
+
+Crawiling in java
 
 ## Features
+
 - [x] crawler
   - [x] option to remove query params when searching for new links
   - [x] whitelist from other html
@@ -30,7 +32,7 @@ Crawiling in java
     - [x] html
     - [x] http header redirects: Location
     - [ ] robots.txt
-    - [ ] sitemap xml gz.xml 
+    - [ ] sitemap xml gz.xml
     - [ ] feed
   - [ ] link/content filtering
     - [x] authority: domain/subdomain
@@ -40,10 +42,10 @@ Crawiling in java
   - [x] adding meta
     - [x] http meta
     - [x] hyperlinks meta file
-    - [x] add pluggable config of meta 
-    
+    - [x] add pluggable config of meta
 
 ## History
+
 - [x] 2024-05-06 - added generators like: https://legislatie.just.ro/Public/{DetaliiDocument|DetaliiDocumentAfis}/{1-3}
   - Or between `{` abd `}` separated with `|`
   - Range between `{` abd `}` separated with `-`
@@ -70,9 +72,8 @@ Crawiling in java
 - [ ] scraping
   - [ ] jsoup convert
 
-
-
 ## Competition
 
 ## Development
+
 - To release `mvn release:prepare release:perform -DskipTests=true -Prelease -Darguments="-DskipTests=true -Prelease"`
