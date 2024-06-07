@@ -182,6 +182,18 @@ public class AnreSpotTest {
     };
   }
 
+  public static class AnreDatabase {
+    public Zona[] zone;
+    public List<Furnizor> furnizori;
+    public List<Oferta> oferte;
+  }
+
+  public static class Zona {
+    public String cod;
+    public String nume;
+    public Judet[] judete;
+  }
+
   @Test
   void test() {
     String judete = "https://posf.ro/comparator/api/index.php?request=get-judete";
@@ -201,8 +213,12 @@ public class AnreSpotTest {
       .sortBy(x -> x._1)
       .map(tap(System.out::println));
 
+    String dataStart = "02-06-2024";
+    String tipClient = "casnic";
+    String consumLunar = "100";
     String url1 = """
-        https://posf.ro/comparator/api/index.php?request=comparator-electric&tip_oferta=2&data_start_aplicare=02-06-2024&tip_client=casnic&tip_pret=nediferentiat&consum_anual=1200&consum_lunar=100&valoare_factura_curenta=&nivel_tensiune=JT_&tip_produs=0&perioada_contract=&energie_regenerabila=&factura_electronica=&frecventa_emitere_factura=&procent_zona_noapte=&procent_zona_zi=&frecventa_citire_contor=&valoare_fixa=&denumire_furnizor=""";
+        https://posf.ro/comparator/api/index.php?request=comparator-electric&tip_oferta=0&data_start_aplicare=%s&tip_client=%s&tip_pret=nediferentiat&consum_anual=1200&consum_lunar=%s&valoare_factura_curenta=&nivel_tensiune=JT_&tip_produs=0&perioada_contract=&energie_regenerabila=&factura_electronica=&frecventa_emitere_factura=&procent_zona_noapte=&procent_zona_zi=&frecventa_citire_contor=&valoare_fixa=&denumire_furnizor="""
+      .formatted(dataStart, tipClient, consumLunar);
 
     Seq<Tuple2<Integer, String>> offers = allZones
       .map(x -> x._2.head().idZona)
@@ -222,10 +238,32 @@ public class AnreSpotTest {
       return Tuple.of(offer._1, content1);
     }).toJavaMap(x -> x);
 
-    String allContent = new Yaml().dump(allOffers);
-    allContent = deduplicate2(allContent);
+    AnreDatabase database = new AnreDatabase();
+    database.oferte = Iterator
+      .ofAll(allOffers.entrySet())
+      .flatMap(x -> Iterator.ofAll(x.getValue()))
+      .groupBy(x -> x.idOferta)
+      //TODO check all offers are identical
+      .map(x -> x._2.head())
+      .toJavaList();
+    database.furnizori = Iterator.ofAll(database.oferte)
+      .map(x -> x.furnizor)
+      .groupBy(x -> x.numeFurnizor)
+      .map(x -> x._2.head())
+      .toJavaList();
+
+    String furnizoriContent = Nodes.csv.toString(database.furnizori);
+    System.out.println(furnizoriContent);
+    workdir.child("furnizori-" + consumLunar + ".csv").write(furnizoriContent);
+
+    String oferteContent = Nodes.csv.toString(database.oferte);
+    System.out.println(oferteContent);
+    workdir.child("oferte-" + consumLunar + ".csv").write(oferteContent);
+
+    String allContent = new Yaml().dump(database);
+    //allContent = deduplicate2(allContent);
     //String allContent = Nodes.json.toString(allOffers);
-    workdir.child("all.json").write(allContent);
+    workdir.child("all.yaml").write(allContent);
   }
 
   private String deduplicate2(String allContent) {
@@ -284,6 +322,32 @@ public class AnreSpotTest {
       referenceMap.put(data, data);
       return data;
     }
+  }
+
+  /**
+   * Computes the distance score between two maps based on the number of identical key-value pairs
+   * and the differences in the number of keys.
+   *
+   * @param map1 the first map
+   * @param map2 the second map
+   * @return the distance score
+   */
+  public static int computeDistance(Map<?, ?> map1, Map<?, ?> map2) {
+    int matchingPairs = 0;
+
+    for (Map.Entry<?, ?> entry : map1.entrySet()) {
+      Object key = entry.getKey();
+      Object value = entry.getValue();
+
+      if (map2.containsKey(key) && Objects.equals(value, map2.get(key))) {
+        matchingPairs++;
+      }
+    }
+
+    int totalKeys = map1.size() + map2.size();
+    int nonMatchingPairs = totalKeys - 2 * matchingPairs;
+
+    return nonMatchingPairs;
   }
 
   private static boolean mapsAreEqual(Map<?, ?> map1, Map<?, ?> map2) {
