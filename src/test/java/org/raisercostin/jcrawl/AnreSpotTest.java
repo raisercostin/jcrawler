@@ -27,6 +27,7 @@ import org.raisercostin.jedio.Locations;
 import org.raisercostin.jedio.path.PathLocation;
 import org.raisercostin.nodes.Nodes;
 import org.yaml.snakeyaml.DumperOptions;
+import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.Constructor;
 import org.yaml.snakeyaml.nodes.Node;
@@ -271,7 +272,7 @@ public class AnreSpotTest {
     options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
     options.setPrettyFlow(true);
 
-    Yaml yaml = new Yaml(new Constructor(), new CustomRepresenter(), options);
+    Yaml yaml = new Yaml(new Constructor(new LoaderOptions()), new CustomRepresenter(options), options);
 
     Object data = yaml.load(allContent);
 
@@ -375,7 +376,8 @@ public class AnreSpotTest {
   }
 
   private static class CustomRepresenter extends Representer {
-    public CustomRepresenter() {
+    public CustomRepresenter(DumperOptions options) {
+      super(options);
       this.representers.put(AnchorNode.class, new RepresentAnchorNode());
     }
 

@@ -76,4 +76,8 @@ Crawiling in java
 
 ## Development
 
-- To release `mvn release:prepare release:perform -DskipTests=true -Prelease -Darguments="-DskipTests=true -Prelease"`
+- To release
+  - ```cli
+    npm run release-prepare
+    npm run release-perform-local -- --releaseVersion 0.86
+    ```

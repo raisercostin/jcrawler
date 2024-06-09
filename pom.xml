@@ -1,15 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>org.raisercostin</groupId>
     <artifactId>maven-defaults-raisercostin</artifactId>
     <version>1.23</version>
   </parent>
+  <groupId>org.raisercostin</groupId>
   <artifactId>namek-jcrawl</artifactId>
   <version>0.1</version>
-  <description>Crawler.</description>
+  <description>Simple crawler in java</description>
   <url>${git.url}</url>
   <licenses>
     <license>
@@ -26,20 +27,31 @@
     </developer>
   </developers>
   <scm>
-    <connection>scm:git:${git.url}.git</connection>
-    <developerConnection>scm:git:${git.url}.git</developerConnection>
+    <connection>${scm.connection.url}</connection>
+    <developerConnection>${scm.connection.url}</developerConnection>
     <tag>${project.artifactId}-${project.version}</tag>
     <url>${git.url}</url>
   </scm>
   <issueManagement>
     <system>Github</system>
-    <url>https://github.com/raisercostin/${project.artifactId}/issues</url>
+    <url>${issues.url}</url>
   </issueManagement>
   <distributionManagement>
     <repository>
-      <id>bintray</id>
-      <url>https://api.bintray.com/maven/${bintray.user}/${bintray.repo}/${bintray.package}/;publish=1</url>
+      <id>dist-release-${dist.id}</id>
+      <url>${dist.release.url}</url>
     </repository>
+    <snapshotRepository>
+      <uniqueVersion>false</uniqueVersion>
+      <id>dist-snapshot-${dist.id}</id>
+      <url>${dist.snapshot.url}</url>
+    </snapshotRepository>
+    <!--
+    <site>
+      <id>dist-site-${dist.id}</id>
+      <url>${dist.site.url}</url>
+    </site>
+     -->
   </distributionManagement>
   <properties>
     <createChecksum>true</createChecksum>
@@ -68,19 +80,15 @@
     <org>raisercostin</org>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-    <reactor.version>3.2.5.RELEASE</reactor.version>
     <resource.delimiter>@</resource.delimiter>
     <scm.connection.url>scm:git:${git.url}.git</scm.connection.url>
     <skip.tests>true</skip.tests>
     <sonar.host.url>https://sonarcloud.io</sonar.host.url>
     <sonar.organization>${org}</sonar.organization>
-    <spring.version>5.2.15.RELEASE</spring.version>
     <springboot.version>3.1.5</springboot.version>
-    <springboot.version>2.3.11.RELEASE</springboot.version>
     <timestamp>${maven.build.timestamp}</timestamp>
   </properties>
   <dependencies>
-    <!-- utilities -->
     <dependency>
       <groupId>commons-io</groupId>
       <artifactId>commons-io</artifactId>
@@ -94,7 +102,6 @@
       <artifactId>commons-text</artifactId>
       <version>1.11.0</version>
     </dependency>
-    <!-- <dependency> <groupId>io.reactivex.rxjava2</groupId> <artifactId>rxjava</artifactId> <version>2.2.4</version> </dependency> -->
     <dependency>
       <groupId>com.typesafe</groupId>
       <artifactId>config</artifactId>
@@ -156,7 +163,7 @@
     <dependency>
       <groupId>org.java-websocket</groupId>
       <artifactId>Java-WebSocket</artifactId>
-      <version>1.5.0</version>
+      <version>1.5.4</version>
     </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>
@@ -166,46 +173,18 @@
     <dependency>
       <groupId>org.raisercostin</groupId>
       <artifactId>jedi-nodes-java</artifactId>
-      <version>0.32</version>
+      <version>0.34</version>
+    </dependency>
+    <dependency>
+      <groupId>ch.qos.logback</groupId>
+      <artifactId>logback-classic</artifactId>
+      <optional>true</optional>
     </dependency>
     <dependency>
       <groupId>org.raisercostin</groupId>
       <artifactId>jedio</artifactId>
-      <version>0.97</version>
+      <version>0.99</version>
     </dependency>
-    <!--
-    <dependency>
-      <groupId>org.raisercostin</groupId>
-      <artifactId>namek-server_2.11</artifactId>
-      <version>0.26</version>
-      <exclusions>
-        <exclusion>
-          <groupId>com.google.appengine</groupId>
-          <artifactId>appengine-api-stubs</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.google.appengine</groupId>
-          <artifactId>appengine-api-labs</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>com.google.appengine</groupId>
-          <artifactId>appengine-api-1.0-sdk</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.raisercostin</groupId>
-          <artifactId>jedi-nodes_2.11</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.raisercostin</groupId>
-          <artifactId>jedi-io_2.11</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>org.raisercostin</groupId>
-          <artifactId>jedi-nodes-java</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    -->
     <dependency>
       <groupId>org.jsoup</groupId>
       <artifactId>jsoup</artifactId>
@@ -227,22 +206,6 @@
       <version>4.7.5</version>
     </dependency>
     <dependency>
-      <groupId>io.projectreactor</groupId>
-      <artifactId>reactor-core</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>io.projectreactor.netty</groupId>
-      <artifactId>reactor-netty</artifactId>
-    </dependency>
-    <!--
-    <dependency>
-      <groupId>org.raisercostin</groupId>
-      <artifactId>raisercostin-commons</artifactId>
-      <version>2.27</version>
-    </dependency>
-    -->
-    <!-- logs -->
-    <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-api</artifactId>
     </dependency>
@@ -251,52 +214,15 @@
       <artifactId>snakeyaml</artifactId>
       <version>2.2</version>
     </dependency>
-    <!-- <dependency> <groupId>org.jetbrains.kotlin</groupId> <artifactId>kotlin-stdlib</artifactId> <version>${kotlin.version}</version> </dependency> 
-			<dependency> <groupId>org.jetbrains.kotlin</groupId> <artifactId>kotlin-test-junit</artifactId> <version>${kotlin.version}</version> <scope>test</scope> 
-			</dependency> -->
     <dependency>
       <groupId>org.springframework</groupId>
       <artifactId>spring-core</artifactId>
     </dependency>
-    <!-- tests -->
-    <!-- 
-    <dependency>
-      <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-starter-test</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-test</artifactId>
-      <type>jar</type>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.springframework</groupId>
-      <artifactId>spring-test</artifactId>
-      <type>jar</type>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>io.projectreactor</groupId>
-      <artifactId>reactor-test</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.skyscreamer</groupId>
-      <artifactId>jsonassert</artifactId>
-      <version>1.5.0</version>
-      <scope>test</scope>
-    </dependency>
-     -->
-    <!-- <dependency> <groupId>org.mapstruct</groupId> <artifactId>mapstruct-jdk8</artifactId> <version>${org.mapstruct.version}</version> </dependency> -->
-    <!-- <dependency> <groupId>org.mapstruct</groupId> <artifactId>mapstruct-processor</artifactId> <version>${org.mapstruct.version}</version> 
-			</dependency> -->
     <!-- pdfbox, poi, tabula -->
     <dependency>
       <groupId>technology.tabula</groupId>
       <artifactId>tabula</artifactId>
-      <version>1.0.2</version>
+      <version>1.0.5</version>
       <exclusions>
         <exclusion>
           <groupId>commons-logging</groupId>
@@ -313,86 +239,20 @@
       <artifactId>tagsoup</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.mashape.unirest</groupId>
-      <artifactId>unirest-java</artifactId>
-      <version>1.4.9</version>
-      <exclusions>
-        <exclusion>
-          <groupId>commons-logging</groupId>
-          <artifactId>commons-logging</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
       <groupId>io.vavr</groupId>
       <artifactId>vavr</artifactId>
     </dependency>
-    <!-- 
-    <dependency>
-      <groupId>org.apache.commons</groupId>
-      <artifactId>commons-vfs2</artifactId>
-      <version>2.1</version>
-      <optional>true</optional>
-    </dependency>
-    <dependency>
-      <groupId>commons-httpclient</groupId>
-      <artifactId>commons-httpclient</artifactId>
-      <optional>true</optional>
-    </dependency>
-    <dependency>
-      <groupId>commons-codec</groupId>
-      <artifactId>commons-codec</artifactId>
-      <optional>true</optional>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.commons</groupId>
-      <artifactId>commons-email</artifactId>
-      <version>1.4</version>
-      <exclusions>
-        <exclusion>
-          <groupId>com.sun.mail</groupId>
-          <artifactId>javax.mail</artifactId>
-        </exclusion>
-        <exclusion>
-          <groupId>javax.activation</groupId>
-          <artifactId>activation</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    <dependency>
-      <groupId>com.sun.mail</groupId>
-      <artifactId>javax.mail</artifactId>
-      <version>1.5.5</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.tika</groupId>
-      <artifactId>tika-core</artifactId>
-      <version>1.18</version>
-    </dependency>
-    <dependency>
-      <groupId>org.json</groupId>
-      <artifactId>json</artifactId>
-      <version>20170516</version>
-    </dependency>
-    <dependency>
-      <groupId>com.networknt</groupId>
-      <artifactId>json-schema-validator</artifactId>
-      <version>0.1.7</version>
-      <exclusions>
-        <exclusion>
-          <groupId>com.fasterxml.jackson.core</groupId>
-          <artifactId>jackson-databind</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
-    -->
-    <dependency>
-      <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-devtools</artifactId>
-      <scope>runtime</scope>
-    </dependency>
+
   </dependencies>
   <repositories>
+    <repository>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+      <id>central</id>
+      <name>Central Repository</name>
+      <url>https://repo.maven.apache.org/maven2</url>
+    </repository>
     <repository>
       <snapshots>
         <enabled>false</enabled>
@@ -447,9 +307,6 @@
           <googleContainerRegistryEnabled>false</googleContainerRegistryEnabled>
         </configuration>
       </plugin>
-      <!-- https://github.com/coveo/fmt-maven-plugin -->
-      <!-- <plugin> <groupId>com.coveo</groupId> <artifactId>fmt-maven-plugin</artifactId> <version>2.6.0</version> <executions> <execution> <goals> 
-				<goal>format</goal> </goals> </execution> </executions> </plugin> -->
       <!-- https://github.com/revelc/formatter-maven-plugin -->
       <plugin>
         <groupId>net.revelc.code.formatter</groupId>
@@ -463,8 +320,10 @@
             <include>**/**</include>
           </includes>
           <excludes>
-            <exclude>.git/**</exclude>
-            <exclude>**/target/**</exclude>
+            <exclude>.git/</exclude>
+            <exclude>target/</exclude>
+            <exclude>node_modules/</exclude>
+            <exclude>package-lock.json</exclude>
             <exclude>**/*.xml</exclude>
           </excludes>
           <lineEnding>LF</lineEnding>
@@ -548,35 +407,28 @@
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-assembly-plugin</artifactId>
+        <artifactId>maven-antrun-plugin</artifactId>
         <!--$NO-MVN-MAN-VER$ -->
+        <configuration>
+          <target>
+            <echo message="ant cleanup started." />
+            <fixcrlf eol="unix" excludes="target/**/* .git/**/* src/test/resources/lsports/**/*" includes="**/*.java **/*.xml" preservelastmodified="true" srcdir="${basedir}" tab="remove" tablength="2" />
+            <echo message="ant cleanup finished." />
+          </target>
+        </configuration>
+        <!-- not always needed -->
+        <!--
         <executions>
           <execution>
-            <id>make-assembly</id>
+            <id>all-format</id>
+            <phase>validate</phase>
             <goals>
-              <goal>single</goal>
+              <goal>run</goal>
             </goals>
-            <phase>package</phase>
-            <configuration>
-              <archive>
-                <manifest>
-                  <mainClass>${main.class}</mainClass>
-                </manifest>
-              </archive>
-              <descriptorRefs>
-                <descriptorRef>jar-with-dependencies</descriptorRef>
-              </descriptorRefs>
-            </configuration>
           </execution>
         </executions>
+        -->
       </plugin>
-      <!-- <sourceDirectory>src/main/kotlin</sourceDirectory> <testSourceDirectory>src/test/kotlin</testSourceDirectory> <plugin> <groupId>org.jetbrains.kotlin</groupId> 
-				<artifactId>kotlin-maven-plugin</artifactId> <version>${kotlin.version}</version> <configuration> <nowarn>false</nowarn> <args> <arg>-Xjsr305=strict</arg> 
-				Enable strict mode for JSR-305 annotations </args> </configuration> <executions> <execution> <id>compile</id> <phase>compile</phase> <goals> 
-				<goal>compile</goal> </goals> <configuration> <sourceDirs> <sourceDir>${project.basedir}/src/main/kotlin</sourceDir> <sourceDir>${project.basedir}/src/main/java</sourceDir> 
-				</sourceDirs> </configuration> </execution> <execution> <id>test-compile</id> <phase>test-compile</phase> <goals> <goal>test-compile</goal> </goals> 
-				<configuration> <sourceDirs> <sourceDir>${project.basedir}/src/test/kotlin</sourceDir> <sourceDir>${project.basedir}/src/test/java</sourceDir> 
-				</sourceDirs> </configuration> </execution> </executions> </plugin> -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
@@ -607,7 +459,7 @@
           <archive>
             <manifest>
               <addClasspath>true</addClasspath>
-              <mainClass>${main.class}</mainClass>
+              <mainClass>${mainClass}</mainClass>
             </manifest>
           </archive>
         </configuration>
@@ -641,13 +493,38 @@
           </dependency>
         </dependencies>
       </plugin>
+      <!--
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-assembly-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>make-assembly</id>
+            <phase>package</phase>
+            <goals>
+              <goal>single</goal>
+            </goals>
+            <configuration>
+              <archive>
+                <manifest>
+                  <mainClass>${mainClass}</mainClass>
+                </manifest>
+              </archive>
+              <descriptorRefs>
+                <descriptorRef>jar-with-dependencies</descriptorRef>
+              </descriptorRefs>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
       <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
         <configuration>
-          <mainClass>org.raisercostin.jedio.LocationsTest</mainClass>
+          <mainClass>${mainClass}</mainClass>
         </configuration>
       </plugin>
+       -->
       <plugin>
         <groupId>au.com.acegi</groupId>
         <artifactId>xml-format-maven-plugin</artifactId>
@@ -663,9 +540,11 @@
               <excludes>
                 <exclude>**/src/main/resources/**</exclude>
                 <exclude>**/src/test/resources/**</exclude>
-                <exclude>**/src/test/resources2/**</exclude>
                 <exclude>.git/**</exclude>
                 <exclude>**/target/**</exclude>
+                <exclude>**/node_modules/**</exclude>
+                <exclude>package-lock.json</exclude>
+                <exclude>.m2/**</exclude>
               </excludes>
               <!-- configure your formatting preferences here (see link below) https://acegi.github.io/xml-format-maven-plugin/xml-format-mojo.html -->
               <indentSize>2</indentSize>

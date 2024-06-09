@@ -26,17 +26,14 @@ import lombok.ToString;
 import lombok.With;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.text.StringTokenizer;
-import org.assertj.core.util.Throwables;
 import org.checkerframework.checker.nullness.qual.NonNull;
 import org.jedio.struct.RichIterable;
-import org.raisercostin.jedio.BasicDirLocation;
 import org.raisercostin.jedio.DirLocation;
 import org.raisercostin.jedio.FileLocation;
 import org.raisercostin.jedio.Location;
 import org.raisercostin.jedio.Locations;
 import org.raisercostin.jedio.ReadableFileLocation;
 import org.raisercostin.jedio.ReferenceLocation;
-import org.raisercostin.jedio.RelativeLocation;
 import org.raisercostin.jedio.WritableFileLocation;
 import org.raisercostin.jedio.url.WebClientLocation2.RequestResponse;
 import org.raisercostin.jedio.url.WebClientLocation2.RequestResponse.Metadata;
@@ -304,7 +301,7 @@ public class JCrawler {
           .groupBy(x -> x.externalForm)
           .map(x -> x._2.head());
       } catch (Exception e) {
-        Throwable root = Throwables.getRootCause(e);
+        Throwable root = com.google.common.base.Throwables.getRootCause(e);
         if (root != null) {
           if (root instanceof SocketException e3 && e3.getMessage().equals("Connection reset")) {
             throw e;
