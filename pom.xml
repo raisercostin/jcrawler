@@ -149,7 +149,7 @@
       <scope>test</scope>
     </dependency>
  -->
-    <!-- <dependency> <groupId>org.junit.platform</groupId> <artifactId>junit-platform-launcher</artifactId> <version>1.1.0</version> <scope>test</scope> 
+    <!-- <dependency> <groupId>org.junit.platform</groupId> <artifactId>junit-platform-launcher</artifactId> <version>1.1.0</version> <scope>test</scope>
 			</dependency> -->
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
@@ -189,11 +189,6 @@
       <groupId>org.jsoup</groupId>
       <artifactId>jsoup</artifactId>
       <version>1.13.1</version>
-    </dependency>
-    <dependency>
-      <groupId>ch.qos.logback</groupId>
-      <artifactId>logback-classic</artifactId>
-      <optional>true</optional>
     </dependency>
     <dependency>
       <groupId>org.projectlombok</groupId>
@@ -447,9 +442,9 @@
           </annotationProcessorPaths>
           <generatedSourcesDirectory>${project.build.directory}/generated-sources</generatedSourcesDirectory>
         </configuration>
-        <!-- <executions> Replacing default-compile as it is treated specially by maven <execution> <id>default-compile</id> <phase>none</phase> 
-					</execution> Replacing default-testCompile as it is treated specially by maven <execution> <id>default-testCompile</id> <phase>none</phase> </execution> 
-					<execution> <id>java-compile</id> <phase>compile</phase> <goals> <goal>compile</goal> </goals> </execution> <execution> <id>java-test-compile</id> 
+        <!-- <executions> Replacing default-compile as it is treated specially by maven <execution> <id>default-compile</id> <phase>none</phase>
+					</execution> Replacing default-testCompile as it is treated specially by maven <execution> <id>default-testCompile</id> <phase>none</phase> </execution>
+					<execution> <id>java-compile</id> <phase>compile</phase> <goals> <goal>compile</goal> </goals> </execution> <execution> <id>java-test-compile</id>
 					<phase>test-compile</phase> <goals> <goal>testCompile</goal> </goals> </execution> </executions> -->
       </plugin>
       <plugin>
