@@ -35,7 +35,8 @@ public class ParallelGraphTraverser<N> {
     this.executor = Executors.newFixedThreadPool(numberOfWorkerThreads);
   }
 
-  private static class SentinelKillPill {}
+  private static class SentinelKillPill {
+  }
 
   private static final SentinelKillPill STOP = new SentinelKillPill();
 
