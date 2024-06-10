@@ -65,21 +65,20 @@ public class JCrawler {
 
     public static Crawler of(WebLocation webLocation, DirLocation cache,
         Option<ReadableFileLocation> whitelistSample) {
-      boolean includeQuery = false;
       Option<Set<String>> whitelist = whitelistSample
         .map(x -> extractLinksFromContent(x.readContent(), null, null)
           .map(z -> z.withoutQuery())
           .toSet());
       Seq<String> start = webLocation.ls().map(x -> x.asHttpClientLocation().toExternalForm()).toList();
       return new Crawler(TraversalType.BREADTH_FIRST, Nodes.json, start, cache, webLocation, start.toSet(),
-        includeQuery, whitelist, -1, 3, null, Duration.ofDays(100), null, Verbosity.INFO, false);
+        whitelist, -1, 3, null, Duration.ofDays(100), null, Verbosity.INFO, false);
     }
 
     public enum TraversalType {
       PARALLEL_BREADTH_FIRST {
         @Override
         public <N> Iterable<N> traverse(Crawler config, Iterable<N> todo, SuccessorsFunction<N> successor) {
-          return new ParallelGraphTraverser<>(config.maxConnections, successor).startTraversal(todo, config.maxDocs);
+          return new ParallelGraphTraverser<>(config.maxConnections,successor).startTraversal(todo,config.maxDocs);
         }
       },
       BREADTH_FIRST {
@@ -137,16 +136,50 @@ public class JCrawler {
     public DirLocation cache = Locations.current().child(".crawl");
     public WebLocation webLocation;
     public Set<String> children;
-    public boolean includeQuery;
     public Option<Set<String>> exactMatch;
+    @picocli.CommandLine.Option(names = { "--maxDocs" })
     public int maxDocs = Integer.MAX_VALUE;
+    @picocli.CommandLine.Option(names = { "--maxConnections" })
     public int maxConnections = 3;
     @picocli.CommandLine.Option(names = { "-p", "--protocol" },
         description = "Set the protocol: ${COMPLETION-CANDIDATES}.",
         showDefaultValue = Visibility.ALWAYS)
     public HttpProtocol[] protocols;
-    public TemporalAmount cacheExpiryDuration = Duration.ofDays(100);
-    @picocli.CommandLine.Parameters(paramLabel = "urls", description = "Urls to crawl.")
+    @picocli.CommandLine.Option(names = { "--expire" },
+        description = "Expiration as a iso 8601 format like P1DT1S. \n Full format P(n)Y(n)M(n)DT(n)H(n)M(n)S\nSee more at https://www.digi.com/resources/documentation/digidocs/90001488-13/reference/r_iso_8601_duration_format.htm")
+    public Duration cacheExpiryDuration = Duration.ofDays(100);
+    @picocli.CommandLine.Parameters(paramLabel = "urls", description = """
+        Urls to
+    crawl.If urls
+    contain expressions
+    all combinations
+    of that
+    values will
+    be generated:-
+    ranges like
+    {start-end}
+    that will
+    be expanded
+    to all
+    values between
+    start and end.-
+    alternatives like
+    {option1|option2|option3}
+    and all
+    of them
+    will be
+    used
+
+    For
+    example https://namekis.com/{docA|doc2}/{1-3}
+    will generate
+    the following urls:https://namekis.com/docA/1
+    https://namekis.com/docA/2
+    https://namekis.com/docA/3
+    https://namekis.com/doc2/1
+    https://namekis.com/doc2/2
+    https://namekis.com/doc2/3
+    """)
     public String generator;
     @picocli.CommandLine.Option(names = { "-v", "--verbosity" },
         description = "Set the verbosity level: ${COMPLETION-CANDIDATES}.",

@@ -105,7 +105,7 @@ class JCrawlerTest {
 
   @Test
   void testMain() {
-    //JCrawler.mainOne("https://legislatie.just.ro/Public/DetaliiDocument/1 --debug --protocol=HTTP11");
+    //JCrawler.mainOne("https://legislatie.just.ro/Public/DetaliiDocument/1 --debug --protocol=HTTP11 --expire PT1S");
     JCrawler.mainOne("");
   }
 
@@ -113,5 +113,18 @@ class JCrawlerTest {
   void testAdvisors() {
     JCrawler.crawl(Locations.web("www.holisticadvisors.net/en"), Option.none(),
       Locations.dir("d:\\home\\raiser\\work\\_var_namek_jcrawl\\scan5-advisors").mkdirIfNeeded());
+  }
+
+  @Test
+  void raisercostinOrg() {
+    JCrawler.mainOne("");
+    Crawler crawler = Crawler.crawler().start("http://raisercostin.org");
+    assertThat(crawler.crawl().take(6).mkString("\n")).isEqualTo("""
+        http://raisercostin.org
+        https://raisercostin.org/
+        https://raisercostin.org/bliki
+        https://raisercostin.org/talk
+        https://raisercostin.org/2017/04/24/GhostInTheShell
+        https://raisercostin.org/2017/04/18/PalidulAlbastruPunct""");
   }
 }

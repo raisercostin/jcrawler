@@ -72,7 +72,7 @@
     <jackson.version>2.12.5</jackson.version>
     <lombok.version>1.18.32</lombok.version>
     <m2e.apt.activation>jdt_apt</m2e.apt.activation>
-    <mainClass>None</mainClass>
+    <mainClass>org.raisercostin.jcrawl.JCrawler</mainClass>
     <maven.build.timestamp.format>yyyyMMdd'T'HHmmss</maven.build.timestamp.format>
     <maven.test.skip>false</maven.test.skip>
     <myJavaVersion>17</myJavaVersion>
@@ -530,6 +530,7 @@
           </execution>
         </executions>
       </plugin>
+       -->
       <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
@@ -537,7 +538,6 @@
           <mainClass>${mainClass}</mainClass>
         </configuration>
       </plugin>
-       -->
       <plugin>
         <groupId>au.com.acegi</groupId>
         <artifactId>xml-format-maven-plugin</artifactId>
