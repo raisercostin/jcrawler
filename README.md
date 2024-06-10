@@ -5,7 +5,7 @@ Crawler tool and java fluent library.
 ## Install
 
 ```cli
-scoop install https://raw.githubusercontent.com/raisercostin/jcrawler/master/jcrawler.json
+scoop install https://github.com/raisercostin/jcrawler/raw/master/jcrawler.json
 ```
 
 ## CLI Usage
