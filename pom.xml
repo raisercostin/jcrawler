@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <parent>
     <groupId>org.raisercostin</groupId>
@@ -287,19 +288,21 @@
       </plugins>
     </pluginManagement>
     <plugins>
+      <!--
       <plugin>
         <groupId>com.spotify</groupId>
         <artifactId>dockerfile-maven-plugin</artifactId>
         <version>1.4.7</version>
         <configuration>
-          <!--<repository>${docker.image.prefix}/${project.artifactId}</repository> -->
-          <!--<registryUrl>http://office-dockerregistry.openobjects.com:5000/v2/</registryUrl> -->
-          <buildArgs>
-            <JAR_FILE>${project.build.finalName}.jar</JAR_FILE>
-          </buildArgs>
-          <googleContainerRegistryEnabled>false</googleContainerRegistryEnabled>
-        </configuration>
-      </plugin>
+          - <repository>${docker.image.prefix}/${project.artifactId}</repository> -
+       - <registryUrl>http://office-dockerregistry.openobjects.com:5000/v2/</registryUrl> -
+      <buildArgs>
+        <JAR_FILE>${project.build.finalName}.jar</JAR_FILE>
+      </buildArgs>
+      <googleContainerRegistryEnabled>false</googleContainerRegistryEnabled>
+    </configuration>
+  </plugin>
+      -->
       <!-- https://github.com/revelc/formatter-maven-plugin -->
       <plugin>
         <groupId>net.revelc.code.formatter</groupId>
@@ -346,6 +349,7 @@
           </dependency>
           -->
         </dependencies>
+        <!--
         <executions>
           <execution>
             <id>all-format</id>
@@ -355,6 +359,7 @@
             <phase>validate</phase>
           </execution>
         </executions>
+        -->
       </plugin>
       <plugin>
         <groupId>pl.project13.maven</groupId>
