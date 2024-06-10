@@ -60,6 +60,30 @@ Commands:
 
 ## Library Usage
 
+### Maven
+
+#### Dependency
+
+See released versions at https://github.com/raisercostin/maven-repo/tree/master/org/raisercostin/jcrawler/0.1
+
+```
+<dependency>
+  <groupId>org.raisercostin</groupId>
+  <artifactId>jcrawler</artifactId>
+  <version>0.1</version>
+</dependency>
+```
+
+#### Repository
+
+```
+<repository>
+  <id>raisercostin-github</id>
+  <url>https://github.com/raisercostin/maven-repo/tree/master</url>
+  <snapshots><enabled>false</enabled></snapshots>
+</repository>
+```
+
 ### Minimal config
 
 ```java

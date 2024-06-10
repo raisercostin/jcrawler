@@ -252,7 +252,7 @@
       </snapshots>
       <id>raisercostin-github</id>
       <name>Repository at https://github.com/raisercostin/maven-repo</name>
-      <url>https://raw.githubusercontent.com/raisercostin/maven-repo/master</url>
+      <url>https://github.com/raisercostin/maven-repo/tree/master</url>
     </repository>
   </repositories>
   <build>
@@ -277,7 +277,7 @@
                     </goals>
                   </pluginExecutionFilter>
                   <action>
-                    <ignore />
+                    <ignore/>
                   </action>
                 </pluginExecution>
               </pluginExecutions>
@@ -402,7 +402,7 @@
                   </goals>
                 </pluginExecutionFilter>
                 <action>
-                  <ignore />
+                  <ignore/>
                 </action>
               </pluginExecution>
               <pluginExecution>
@@ -415,7 +415,7 @@
                   </goals>
                 </pluginExecutionFilter>
                 <action>
-                  <ignore />
+                  <ignore/>
                 </action>
               </pluginExecution>
             </pluginExecutions>
@@ -428,9 +428,9 @@
         <!--$NO-MVN-MAN-VER$ -->
         <configuration>
           <target>
-            <echo message="ant cleanup started." />
-            <fixcrlf eol="unix" excludes="target/**/* .git/**/* src/test/resources/lsports/**/*" includes="**/*.java **/*.xml" preservelastmodified="true" srcdir="${basedir}" tab="remove" tablength="2" />
-            <echo message="ant cleanup finished." />
+            <echo message="ant cleanup started."/>
+            <fixcrlf eol="unix" excludes="target/**/* .git/**/* src/test/resources/lsports/**/*" includes="**/*.java **/*.xml" preservelastmodified="true" srcdir="${basedir}" tab="remove" tablength="2"/>
+            <echo message="ant cleanup finished."/>
           </target>
         </configuration>
         <!-- not always needed -->
