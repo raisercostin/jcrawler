@@ -30,16 +30,18 @@ function releasePerformLocal(args?: any): void {
   );
 
   // Call createChecksums for each type
-  ["", ".pom", ".jar", "-javadoc.jar", "-sources.jar", "-main.jar"].forEach((classifier) => {
-    createChecksums(
-      classifier,
-      version,
-      repo,
-      localMavenRepo,
-      groupPath,
-      artifactId,
-    );
-  });
+  ["", ".pom", ".jar", "-javadoc.jar", "-sources.jar", "-main.jar"].forEach(
+    (classifier) => {
+      createChecksums(
+        classifier,
+        version,
+        repo,
+        localMavenRepo,
+        groupPath,
+        artifactId,
+      );
+    },
+  );
 
   //shell.rm("-rf", `${repo}/${groupPath}/${artifactId}/${version}/*main*`);
   shell.exec(`git -C ${repo} status`);
