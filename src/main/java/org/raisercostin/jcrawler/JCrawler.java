@@ -138,7 +138,7 @@ public class JCrawler implements Callable<Integer> {
     PARALLEL_BREADTH_FIRST {
       @Override
       public <N> Iterable<N> traverse(JCrawler config, Iterable<N> todo, SuccessorsFunction<N> successor) {
-        return new ParallelGraphTraverser<>(config.maxConnections, successor).startTraversal(todo, config.maxDocs);
+        return new ParallelGraphTraverser<>(config.maxConnections,successor).startTraversal(todo,config.maxDocs);
       }
     },
     BREADTH_FIRST {
@@ -213,16 +213,24 @@ public class JCrawler implements Callable<Integer> {
   public Duration cacheExpiryDuration = Duration.ofDays(100);
   @picocli.CommandLine.Parameters(paramLabel = "urls",
       description = """
-          Urls to crawl. If urls contain expressions all combinations of that values will be generated:
-          - ranges like {start-end}
-          - alternatives like {option1|option2|option3}
-          For example https://namekis.com/{docA|doc2}/{1-3} will generate the following urls:
-          - https://namekis.com/docA/1
-          - https://namekis.com/docA/2
-          - https://namekis.com/docA/3
-          - https://namekis.com/doc2/1
-          - https://namekis.com/doc2/2
-          - https://namekis.com/doc2/3""")
+          Urls to
+  crawl.If urls
+  contain expressions
+  all combinations
+  of that
+  values will
+  be generated:-
+  ranges like
+  {start-end}-
+  alternatives like
+  {option1|option2|option3}
+  For example https://namekis.com/{docA|doc2}/{1-3} will generate the following urls:
+  -https://namekis.com/docA/1
+  -https://namekis.com/docA/2
+  -https://namekis.com/docA/3
+  -https://namekis.com/doc2/1
+  -https://namekis.com/doc2/2
+  -https://namekis.com/doc2/3""")
   public String generator;
   @picocli.CommandLine.Option(names = { "-v", "--verbosity" },
       description = "Set the verbosity level: ${COMPLETION-CANDIDATES}.",
