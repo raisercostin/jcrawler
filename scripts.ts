@@ -24,13 +24,9 @@ function releasePerformLocal(args?: any): void {
   const artifactId = args.artifactId;
 
   shell.mkdir("-p", `${repo}/${groupPath}/${artifactId}/${version}`);
-  shell.cp(
-    `${localMavenRepo}/${groupPath}/${artifactId}/${version}/${artifactId}-${version}*`,
-    `${repo}/${groupPath}/${artifactId}/${version}/`,
-  );
 
   // Call createChecksums for each type
-  ["", ".pom", ".jar", "-javadoc.jar", "-sources.jar", "-main.jar"].forEach(
+  [".pom", ".jar", "-javadoc.jar", "-sources.jar", "-main.jar"].forEach(
     (classifier) => {
       createChecksums(
         classifier,
@@ -69,11 +65,24 @@ function createChecksums(
   groupPath: string,
   artifactId: string,
 ): void {
-  let file = `${repo}/${groupPath}/${artifactId}/${version}/${artifactId}-${version}${classifier}`;
-  shell.rm("-f", `${file}.sha1`);
-  shell.exec(`sha1sum.exe ${file} | cut -d ' ' -f 1 > ${file}.sha1`);
-  shell.rm("-f", `${file}.md5`);
-  shell.exec(`md5sum.exe ${file} | cut -d ' ' -f 1 > ${file}.md5`);
+  let source = `${localMavenRepo}/${groupPath}/${artifactId}/${version}/${artifactId}-${version}${classifier}`
+  if (!shell.test("-e", source)) {
+    console.log(`${red}File not found: ${source}${reset}`);
+    if (classifier !== "-main.jar")
+      shell.exit(1);
+  } else {
+    shell.cp(source, `${repo}/${groupPath}/${artifactId}/${version}/`);
+    let file = `${repo}/${groupPath}/${artifactId}/${version}/${artifactId}-${version}${classifier}`;
+    if (!shell.test("-e", file)) {
+      console.log(`${red}File not found: ${file}${reset}`);
+      throw new Error(`File not found: ${file}`);
+    } else {
+      shell.rm("-f", `${file}.sha1`);
+      shell.exec(`sha1sum.exe ${file} | cut -d ' ' -f 1 > ${file}.sha1`);
+      shell.rm("-f", `${file}.md5`);
+      shell.exec(`md5sum.exe ${file} | cut -d ' ' -f 1 > ${file}.md5`);
+    }
+  }
 }
 
 function runTest(test: string = "LocationsTest"): void {
