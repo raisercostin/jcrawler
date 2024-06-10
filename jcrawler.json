@@ -6,15 +6,15 @@
   "suggest": {
     "Java Runtime Environment": "java/termurin17-jre"
   },
-  "url": "https://raw.githubusercontent.com/raisercostin/maven-repo/master/org/raisercostin/jcrawler/0.1/jcrawler-main-0.1.jar",
-  "hash": "2b0b47a72b2acde535e5dfe2751cd3a1b65c0bed047d3c33e26146716bf99243",
-  "pre_install": "Set-Content -Path \"$dir\\jcrawler.bat\" -Value \"pushd $dir && @java -jar %~dp0jcrawler-main-0.1.jar %* && popd\"",
-  "bin": "jcrawler.bat",
+  "url": "https://github.com/raisercostin/maven-repo/raw/master/org/raisercostin/jcrawler/0.1/jcrawler-0.1-main.jar",
+  "hash": "71b5af0de725be07e3de6fcc126011ec8d62b5fbcbdadc5eae9757a9eb944a33",
+  "pre_install": "Set-Content -Path \"$dir\\jcrawler.cmd\" -Value \"@java -jar %~dp0jcrawler-0.1-main.jar %*\" -Encoding ASCII",
+  "bin": "jcrawler.cmd",
   "checkver": {
     "url": "https://github.com/raisercostin/maven-repo/tree/master/org/raisercostin/jcrawler",
     "re": "href=\\\"[^\"]*/(\\d+\\.\\d+\\.\\d+)/\\\""
   },
   "autoupdate": {
-    "url": "https://raw.githubusercontent.com/raisercostin/maven-repo/master/org/raisercostin/jcrawler/$version/jcrawler-main-$version.jar"
+    "url": "https://github.com/raisercostin/maven-repo/raw/master/org/raisercostin/jcrawler/$version/jcrawler-$version-main.jar"
   }
 }
