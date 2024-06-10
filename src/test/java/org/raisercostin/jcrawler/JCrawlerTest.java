@@ -1,4 +1,4 @@
-package org.raisercostin.jcrawl;
+package org.raisercostin.jcrawler;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -9,8 +9,8 @@ import org.jedio.struct.RichIterable;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.raisercostin.jcrawl.JCrawler.Crawler;
-import org.raisercostin.jcrawl.JCrawler.Crawler.TraversalType;
+import org.raisercostin.jcrawler.JCrawler;
+import org.raisercostin.jcrawler.JCrawler.TraversalType;
 import org.raisercostin.jedio.Locations;
 import org.raisercostin.jscraper.JScraper;
 import reactor.netty.http.HttpProtocol;
@@ -44,7 +44,7 @@ class JCrawlerTest {
     JScraper.scrape(Locations.dir("d:\\home\\raiser\\work\\_var_namek_jcrawl\\scan3-restocracy").mkdirIfNeeded());
   }
 
-  Crawler crawler = Crawler
+  JCrawler crawler = JCrawler
     .crawler()
     .start("https://legislatie.just.ro/Public/DetaliiDocument/1")
     .withCache(Locations.dir("d:\\home\\raiser\\work\\_var_namek_jcrawl\\scan4-just").mkdirIfNeeded())
@@ -123,7 +123,7 @@ class JCrawlerTest {
   @Test
   void raisercostinOrg() {
     JCrawler.mainOne("", false);
-    Crawler crawler = Crawler.crawler().start("http://raisercostin.org");
+    JCrawler crawler = JCrawler.crawler().start("http://raisercostin.org");
     assertThat(crawler.crawl().take(6).mkString("\n")).isEqualTo("""
         http://raisercostin.org
         https://raisercostin.org/

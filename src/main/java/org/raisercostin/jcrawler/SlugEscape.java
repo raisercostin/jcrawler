@@ -1,4 +1,4 @@
-package org.raisercostin.jcrawl;
+package org.raisercostin.jcrawler;
 
 import java.text.Normalizer;
 import java.util.regex.Pattern;

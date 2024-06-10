@@ -1,4 +1,4 @@
-package org.raisercostin.jcrawl;
+package org.raisercostin.jcrawler;
 
 import java.net.SocketException;
 import java.time.Duration;
@@ -48,204 +48,201 @@ import picocli.CommandLine.Help.Visibility;
 import picocli.CommandLine.IExecutionExceptionHandler;
 import reactor.netty.http.HttpProtocol;
 
+@AllArgsConstructor
+@NoArgsConstructor
+@ToString
+@With
+@Command(name = "jcrawl", mixinStandardHelpOptions = true, version = "jcrawl 0.1",
+    description = "Crawl tool.", subcommands = GenerateCompletion.class)
 @Slf4j
-public class JCrawler {
+public class JCrawler implements Callable<Integer> {
+  public static JCrawler crawler() {
+    return new JCrawler();
+  }
 
-  @AllArgsConstructor
-  @NoArgsConstructor
-  @ToString
-  @With
-  @Command(name = "jcrawl", mixinStandardHelpOptions = true, version = "jcrawl 0.1",
-      description = "Crawl tool.", subcommands = GenerateCompletion.class)
-  public static class Crawler implements Callable<Integer> {
-    public static Crawler crawler() {
-      return new Crawler();
-    }
+  public static JCrawler of(WebLocation webLocation, DirLocation cache,
+      Option<ReadableFileLocation> whitelistSample) {
+    Option<Set<String>> whitelist = whitelistSample
+      .map(x -> extractLinksFromContent(x.readContent(), null, null)
+        .map(z -> z.withoutQuery())
+        .toSet());
+    Seq<String> start = webLocation.ls().map(x -> x.asHttpClientLocation().toExternalForm()).toList();
+    return new JCrawler(TraversalType.BREADTH_FIRST, Nodes.json, start, cache, webLocation, start.toSet(),
+      whitelist, -1, 3, null, Duration.ofDays(100), null, Verbosity.INFO, false);
+  }
 
-    public static Crawler of(WebLocation webLocation, DirLocation cache,
-        Option<ReadableFileLocation> whitelistSample) {
-      Option<Set<String>> whitelist = whitelistSample
-        .map(x -> extractLinksFromContent(x.readContent(), null, null)
-          .map(z -> z.withoutQuery())
-          .toSet());
-      Seq<String> start = webLocation.ls().map(x -> x.asHttpClientLocation().toExternalForm()).toList();
-      return new Crawler(TraversalType.BREADTH_FIRST, Nodes.json, start, cache, webLocation, start.toSet(),
-        whitelist, -1, 3, null, Duration.ofDays(100), null, Verbosity.INFO, false);
-    }
-
-    public enum TraversalType {
-      PARALLEL_BREADTH_FIRST {
-        @Override
-        public <N> Iterable<N> traverse(Crawler config, Iterable<N> todo, SuccessorsFunction<N> successor) {
-          return new ParallelGraphTraverser<>(config.maxConnections, successor).startTraversal(todo, config.maxDocs);
-        }
-      },
-      BREADTH_FIRST {
-        @Override
-        public <N> Iterable<N> traverse(Crawler config, Iterable<N> todo, SuccessorsFunction<N> successor) {
-          //TODO bug in guava traversal that checks all initial links twice
-          return Traverser.forGraph(successor).breadthFirst(todo);
-        }
-      },
-      DEPTH_FIRST_PREORDER {
-        @Override
-        public <N> Iterable<N> traverse(Crawler config, Iterable<N> todo, SuccessorsFunction<N> successor) {
-          return Traverser.forGraph(successor).depthFirstPreOrder(todo);
-        }
-      },
-      DEPTH_FIRST_POSTORDER {
-        @Override
-        public <N> Iterable<N> traverse(Crawler config, Iterable<N> todo, SuccessorsFunction<N> successor) {
-          return Traverser.forGraph(successor).depthFirstPostOrder(todo);
-        }
-      };
-
-      abstract <N> Iterable<N> traverse(Crawler config, Iterable<N> todo, SuccessorsFunction<N> successor);
-    }
-
-    public enum Verbosity {
-      NONE(Level.OFF),
-      ERROR(Level.ERROR),
-      WARN(Level.WARN),
-      INFO(Level.INFO),
-      DEBUG(Level.DEBUG),
-      TRACE(Level.TRACE);
-
-      final Level logbackLevel;
-
-      Verbosity(Level logbackLevel) {
-        this.logbackLevel = logbackLevel;
-      }
-    }
-
-    /**Breadth first is usual.*/
-    public TraversalType traversalType = TraversalType.BREADTH_FIRST;
-    public JacksonNodes linksNodes = Nodes.json;
-    public Seq<String> start;
-
-    public static class LocationConverter implements CommandLine.ITypeConverter<Location> {
+  public enum TraversalType {
+    PARALLEL_BREADTH_FIRST {
       @Override
-      public Location convert(String value) throws Exception {
-        return Locations.location(value);
+      public <N> Iterable<N> traverse(JCrawler config, Iterable<N> todo, SuccessorsFunction<N> successor) {
+        return new ParallelGraphTraverser<>(config.maxConnections, successor).startTraversal(todo, config.maxDocs);
       }
-    }
-
-    @picocli.CommandLine.Option(names = { "-o", "--outdir" }, description = "Dir to write crawled content",
-        converter = LocationConverter.class)
-    public DirLocation cache = Locations.current().child(".crawl");
-    public WebLocation webLocation;
-    public Set<String> children;
-    public Option<Set<String>> exactMatch;
-    @picocli.CommandLine.Option(names = { "--maxDocs" })
-    public int maxDocs = Integer.MAX_VALUE;
-    @picocli.CommandLine.Option(names = { "--maxConnections" })
-    public int maxConnections = 3;
-    @picocli.CommandLine.Option(names = { "-p", "--protocol" },
-        description = "Set the protocol: ${COMPLETION-CANDIDATES}.",
-        showDefaultValue = Visibility.ALWAYS)
-    public HttpProtocol[] protocols;
-    @picocli.CommandLine.Option(names = { "--expire" },
-        description = "Expiration as a iso 8601 format like P1DT1S. \n Full format P(n)Y(n)M(n)DT(n)H(n)M(n)S\nSee more at https://www.digi.com/resources/documentation/digidocs/90001488-13/reference/r_iso_8601_duration_format.htm")
-    public Duration cacheExpiryDuration = Duration.ofDays(100);
-    @picocli.CommandLine.Parameters(paramLabel = "urls", description = """
-            Urls to
-        crawl.If urls
-        contain expressions
-        all combinations
-        of that
-        values will
-        be generated:-
-        ranges like
-        {start-end}
-        that will
-        be expanded
-        to all
-        values between
-        start and end.-
-        alternatives like
-        {option1|option2|option3}
-        and all
-        of them
-        will be
-        used
-
-        For
-        example https://namekis.com/{docA|doc2}/{1-3}
-        will generate
-        the following urls:https://namekis.com/docA/1
-        https://namekis.com/docA/2
-        https://namekis.com/docA/3
-        https://namekis.com/doc2/1
-        https://namekis.com/doc2/2
-        https://namekis.com/doc2/3
-        """)
-    public String generator;
-    @picocli.CommandLine.Option(names = { "-v", "--verbosity" },
-        description = "Set the verbosity level: ${COMPLETION-CANDIDATES}.",
-        showDefaultValue = Visibility.ALWAYS)
-    public Verbosity verbosity = Verbosity.INFO;
-    @picocli.CommandLine.Option(names = { "--debug" }, description = "Show stack trace")
-    public boolean debug = false;
-
-    public boolean accept(HyperLink link) {
-      if (exactMatch == null || exactMatch.isEmpty() || exactMatch.get().isEmpty()) {
-        return acceptStarts(link.externalForm);
+    },
+    BREADTH_FIRST {
+      @Override
+      public <N> Iterable<N> traverse(JCrawler config, Iterable<N> todo, SuccessorsFunction<N> successor) {
+        //TODO bug in guava traversal that checks all initial links twice
+        return Traverser.forGraph(successor).breadthFirst(todo);
       }
-      return exactMatch.get().contains(link.externalForm) || acceptStarts(link.externalForm);
-    }
+    },
+    DEPTH_FIRST_PREORDER {
+      @Override
+      public <N> Iterable<N> traverse(JCrawler config, Iterable<N> todo, SuccessorsFunction<N> successor) {
+        return Traverser.forGraph(successor).depthFirstPreOrder(todo);
+      }
+    },
+    DEPTH_FIRST_POSTORDER {
+      @Override
+      public <N> Iterable<N> traverse(JCrawler config, Iterable<N> todo, SuccessorsFunction<N> successor) {
+        return Traverser.forGraph(successor).depthFirstPostOrder(todo);
+      }
+    };
 
-    public boolean acceptStarts(String url) {
-      return children == null || children.exists(x -> url.startsWith(x));
-    }
+    abstract <N> Iterable<N> traverse(JCrawler config, Iterable<N> todo, SuccessorsFunction<N> successor);
+  }
 
-    public Crawler withFiltersByPrefix(String... filters) {
-      return withChildren(API.Set(filters));
-    }
+  public enum Verbosity {
+    NONE(Level.OFF),
+    ERROR(Level.ERROR),
+    WARN(Level.WARN),
+    INFO(Level.INFO),
+    DEBUG(Level.DEBUG),
+    TRACE(Level.TRACE);
 
-    public Crawler withProtocol(HttpProtocol... protocols) {
-      return withProtocols(protocols);
-    }
+    final Level logbackLevel;
 
-    public boolean forceDownload(HyperLink href, WritableFileLocation dest) {
-      return dest.modifiedDateTime().toInstant().isBefore(Instant.now().minus(cacheExpiryDuration));
+    Verbosity(Level logbackLevel) {
+      this.logbackLevel = logbackLevel;
     }
+  }
 
-    public Crawler start(String... urls) {
-      return withStart(API.Seq(urls));
-    }
+  /**Breadth first is usual.*/
+  public TraversalType traversalType = TraversalType.BREADTH_FIRST;
+  public JacksonNodes linksNodes = Nodes.json;
+  public Seq<String> start;
 
+  public static class LocationConverter implements CommandLine.ITypeConverter<Location> {
     @Override
-    public Integer call() throws Exception {
-      crawl().forEach(System.out::println);
-      return 0;
+    public Location convert(String value) throws Exception {
+      return Locations.location(value);
     }
+  }
 
-    public RichIterable<String> crawl() {
-      return crawl(this);
-    }
+  @picocli.CommandLine.Option(names = { "-o", "--outdir" }, description = "Dir to write crawled content",
+      converter = LocationConverter.class)
+  public DirLocation cache = Locations.current().child(".crawl");
+  public WebLocation webLocation;
+  public Set<String> children;
+  public Option<Set<String>> exactMatch;
+  @picocli.CommandLine.Option(names = { "--maxDocs" })
+  public int maxDocs = Integer.MAX_VALUE;
+  @picocli.CommandLine.Option(names = { "--maxConnections" })
+  public int maxConnections = 3;
+  @picocli.CommandLine.Option(names = { "-p", "--protocol" },
+      description = "Set the protocol: ${COMPLETION-CANDIDATES}.",
+      showDefaultValue = Visibility.ALWAYS)
+  public HttpProtocol[] protocols;
+  @picocli.CommandLine.Option(names = { "--expire" },
+      description = "Expiration as a iso 8601 format like P1DT1S. \n Full format P(n)Y(n)M(n)DT(n)H(n)M(n)S\nSee more at https://www.digi.com/resources/documentation/digidocs/90001488-13/reference/r_iso_8601_duration_format.htm")
+  public Duration cacheExpiryDuration = Duration.ofDays(100);
+  @picocli.CommandLine.Parameters(paramLabel = "urls", description = """
+          Urls to
+      crawl.If urls
+      contain expressions
+      all combinations
+      of that
+      values will
+      be generated:-
+      ranges like
+      {start-end}
+      that will
+      be expanded
+      to all
+      values between
+      start and end.-
+      alternatives like
+      {option1|option2|option3}
+      and all
+      of them
+      will be
+      used
 
-    /**Crawls eagerly config.maxDocs.*/
-    public static RichIterable<String> crawl(Crawler config) {
-      CrawlerWorker crawler = new CrawlerWorker(config);
-      if (config.generator != null) {
-        return crawler.crawl(Generators.parse(config.generator).generate().map(x -> HyperLink.of(x)));
-      }
-      return crawler.crawl(config.start.map(x -> HyperLink.of(x)));
-    }
+      For
+      example https://namekis.com/{docA|doc2}/{1-3}
+      will generate
+      the following urls:https://namekis.com/docA/1
+      https://namekis.com/docA/2
+      https://namekis.com/docA/3
+      https://namekis.com/doc2/1
+      https://namekis.com/doc2/2
+      https://namekis.com/doc2/3
+      """)
+  public String generator;
+  @picocli.CommandLine.Option(names = { "-v", "--verbosity" },
+      description = "Set the verbosity level: ${COMPLETION-CANDIDATES}.",
+      showDefaultValue = Visibility.ALWAYS)
+  public Verbosity verbosity = Verbosity.INFO;
+  @picocli.CommandLine.Option(names = { "--debug" }, description = "Show stack trace")
+  public boolean debug = false;
 
-    public FileLocation slug(HyperLink href) {
-      return cachedFile(href.externalForm);
+  public boolean accept(HyperLink link) {
+    if (exactMatch == null || exactMatch.isEmpty() || exactMatch.get().isEmpty()) {
+      return acceptStarts(link.externalForm);
     }
+    return exactMatch.get().contains(link.externalForm) || acceptStarts(link.externalForm);
+  }
 
-    public FileLocation cachedFile(String url) {
-      return (FileLocation) cache.child(SlugEscape.toSlug(url));
+  public boolean acceptStarts(String url) {
+    return children == null || children.exists(x -> url.startsWith(x));
+  }
+
+  public JCrawler withFiltersByPrefix(String... filters) {
+    return withChildren(API.Set(filters));
+  }
+
+  public JCrawler withProtocol(HttpProtocol... protocols) {
+    return withProtocols(protocols);
+  }
+
+  public boolean forceDownload(HyperLink href, WritableFileLocation dest) {
+    return dest.modifiedDateTime().toInstant().isBefore(Instant.now().minus(cacheExpiryDuration));
+  }
+
+  public JCrawler start(String... urls) {
+    return withStart(API.Seq(urls));
+  }
+
+  @Override
+  public Integer call() throws Exception {
+    crawl().forEach(System.out::println);
+    return 0;
+  }
+
+  public RichIterable<String> crawl() {
+    return crawl(this);
+  }
+
+  /**Crawls eagerly config.maxDocs.*/
+  public static RichIterable<String> crawl(JCrawler config) {
+    CrawlerWorker crawler = new CrawlerWorker(config);
+    if (config.generator != null) {
+      return crawler.crawl(Generators.parse(config.generator).generate().map(x -> HyperLink.of(x)));
     }
+    return crawler.crawl(config.start.map(x -> HyperLink.of(x)));
+  }
+
+  public FileLocation slug(HyperLink href) {
+    return cachedFile(href.externalForm);
+  }
+
+  public FileLocation cachedFile(String url) {
+    return (FileLocation) cache.child(SlugEscape.toSlug(url));
   }
 
   public static void crawl(WebLocation webLocation, Option<ReadableFileLocation> whitelistSample,
       DirLocation cache) {
     whitelistSample = whitelistSample.filter(x -> x.exists());
-    Crawler config = Crawler.of(webLocation, cache, whitelistSample);
+    JCrawler config = JCrawler.of(webLocation, cache, whitelistSample);
     log.info("crawling [{}] to {}", webLocation, cache);
     Seq<String> files = config.start;
     files.forEach(System.out::println);
@@ -254,12 +251,12 @@ public class JCrawler {
   }
 
   public static class CrawlerWorker {
-    public final Crawler config;
+    public final JCrawler config;
     public final WebClientFactory client;
     //public final java.util.concurrent.Semaphore semaphore;
     public final BlockingQueue<String> tokenQueue;
 
-    public CrawlerWorker(Crawler config) {
+    public CrawlerWorker(JCrawler config) {
       this.config = config;
       this.client = new WebClientFactory(config.protocols);
       //this.semaphore = new Semaphore(config.maxConnections);
@@ -445,7 +442,7 @@ public class JCrawler {
 
   private static void main(String[] args, boolean exitAtEnd) {
     IExecutionExceptionHandler errorHandler = (ex, cmd, parseResult) -> {
-      Crawler config = cmd.getCommand();
+      JCrawler config = cmd.getCommand();
       if (config.debug) {
         ex.printStackTrace(cmd.getErr()); // Print stack trace to the error stream
       } else {
@@ -460,7 +457,7 @@ public class JCrawler {
           : cmd.getCommandSpec().exitCodeOnExecutionException();
     };
 
-    CommandLine cmd = new CommandLine(new Crawler()).setExecutionExceptionHandler(errorHandler);
+    CommandLine cmd = new CommandLine(new JCrawler()).setExecutionExceptionHandler(errorHandler);
     CommandLine gen = cmd.getSubcommands().get("generate-completion");
     gen.getCommandSpec().usageMessage().hidden(false);
     int exitCode = cmd.execute(args);

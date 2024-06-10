@@ -1,8 +1,9 @@
-package org.raisercostin.jcrawl;
+package org.raisercostin.jcrawler;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
+import org.raisercostin.jcrawler.Generators;
 
 class GeneratorsTest {
   @Test

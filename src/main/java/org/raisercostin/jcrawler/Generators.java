@@ -1,4 +1,4 @@
-package org.raisercostin.jcrawl;
+package org.raisercostin.jcrawler;
 
 import java.util.regex.Matcher;
 

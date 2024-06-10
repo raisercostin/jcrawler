@@ -1,4 +1,4 @@
-package org.raisercostin.jcrawl;
+package org.raisercostin.jcrawler;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -23,7 +23,7 @@ import io.vavr.collection.Seq;
 import lombok.ToString;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.raisercostin.jcrawl.JCrawler.Crawler;
+import org.raisercostin.jcrawler.JCrawler;
 import org.raisercostin.jedio.Locations;
 import org.raisercostin.jedio.path.PathLocation;
 import org.raisercostin.nodes.Nodes;
@@ -200,7 +200,7 @@ public class AnreSpotTest {
   void test() {
     String judete = "https://posf.ro/comparator/api/index.php?request=get-judete";
     PathLocation workdir = Locations.dir("d:\\home\\raiser\\work\\_var_namek_jcrawl\\scan6-anre");
-    Crawler crawler = Crawler
+    JCrawler crawler = JCrawler
       .crawler()
       .withCache(workdir);
     crawler

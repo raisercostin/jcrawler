@@ -1,9 +1,10 @@
-package org.raisercostin.jcrawl;
+package org.raisercostin.jcrawler;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 
 import org.junit.jupiter.api.Test;
+import org.raisercostin.jcrawler.SlugEscape;
 
 class SlugEscapeTest {
   @Test

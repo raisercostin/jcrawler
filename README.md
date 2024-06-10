@@ -59,7 +59,7 @@ Commands:
 ```java
 @Test
 void raisercostinOrg() {
-  Crawler crawler = Crawler.crawler().start("http://raisercostin.org");
+  JCrawler crawler = JCrawler.crawler().start("http://raisercostin.org");
   assertThat(crawler.crawl().take(6).mkString("\n")).isEqualTo("""
       http://raisercostin.org
       https://raisercostin.org/
@@ -101,7 +101,7 @@ This will create in a local dir `.crawl` the files with content but also with me
 
 ```java
 static void main(){
-  Crawler crawler = Crawler
+  JCrawler crawler = JCrawler
     .crawler()
     .start("https://legislatie.just.ro/Public/DetaliiDocument/1")
     .withCache(Locations.dir("d:\\home\\raiser\\work\\_var_namek_jcrawl\\scan4-just").mkdirIfNeeded())
