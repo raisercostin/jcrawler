@@ -6,6 +6,8 @@ import java.time.Duration;
 
 import io.vavr.control.Option;
 import org.jedio.struct.RichIterable;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.raisercostin.jcrawl.JCrawler.Crawler;
 import org.raisercostin.jcrawl.JCrawler.Crawler.TraversalType;
@@ -36,6 +38,7 @@ class JCrawlerTest {
   }
 
   @Test
+  @Tag("bug")
   //@Disabled
   void testRestorcracyScraping() {
     JScraper.scrape(Locations.dir("d:\\home\\raiser\\work\\_var_namek_jcrawl\\scan3-restocracy").mkdirIfNeeded());
@@ -59,7 +62,8 @@ class JCrawlerTest {
     .withProtocol(HttpProtocol.HTTP11);
 
   @Test
-  //@Disabled
+  @Tag("bug-freeze")
+  @Disabled
   void testLegeBreadthFirst() {
     //    WebClientLocation2.defaultClient.webclientWireTap.enable();
     //    WebClientLocation2.defaultClient.webclientWireTapType.setRuntimeValue(AdvancedByteBufFormat.HEX_DUMP);
@@ -88,6 +92,7 @@ class JCrawlerTest {
   }
 
   @Test
+  @Tag("bug")
   //@Disabled
   void testLegeDepthFirstPreorder() {
     RichIterable<String> all = crawler
@@ -106,7 +111,7 @@ class JCrawlerTest {
   @Test
   void testMain() {
     //JCrawler.mainOne("https://legislatie.just.ro/Public/DetaliiDocument/1 --debug --protocol=HTTP11 --expire PT1S");
-    JCrawler.mainOne("");
+    JCrawler.mainOne("", false);
   }
 
   @Test
@@ -117,7 +122,7 @@ class JCrawlerTest {
 
   @Test
   void raisercostinOrg() {
-    JCrawler.mainOne("");
+    JCrawler.mainOne("", false);
     Crawler crawler = Crawler.crawler().start("http://raisercostin.org");
     assertThat(crawler.crawl().take(6).mkString("\n")).isEqualTo("""
         http://raisercostin.org

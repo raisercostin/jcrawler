@@ -3,7 +3,6 @@ package org.raisercostin.jcrawl;
 import java.net.SocketException;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.temporal.TemporalAmount;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
@@ -78,7 +77,7 @@ public class JCrawler {
       PARALLEL_BREADTH_FIRST {
         @Override
         public <N> Iterable<N> traverse(Crawler config, Iterable<N> todo, SuccessorsFunction<N> successor) {
-          return new ParallelGraphTraverser<>(config.maxConnections,successor).startTraversal(todo,config.maxDocs);
+          return new ParallelGraphTraverser<>(config.maxConnections, successor).startTraversal(todo, config.maxDocs);
         }
       },
       BREADTH_FIRST {
@@ -149,37 +148,37 @@ public class JCrawler {
         description = "Expiration as a iso 8601 format like P1DT1S. \n Full format P(n)Y(n)M(n)DT(n)H(n)M(n)S\nSee more at https://www.digi.com/resources/documentation/digidocs/90001488-13/reference/r_iso_8601_duration_format.htm")
     public Duration cacheExpiryDuration = Duration.ofDays(100);
     @picocli.CommandLine.Parameters(paramLabel = "urls", description = """
-        Urls to
-    crawl.If urls
-    contain expressions
-    all combinations
-    of that
-    values will
-    be generated:-
-    ranges like
-    {start-end}
-    that will
-    be expanded
-    to all
-    values between
-    start and end.-
-    alternatives like
-    {option1|option2|option3}
-    and all
-    of them
-    will be
-    used
+            Urls to
+        crawl.If urls
+        contain expressions
+        all combinations
+        of that
+        values will
+        be generated:-
+        ranges like
+        {start-end}
+        that will
+        be expanded
+        to all
+        values between
+        start and end.-
+        alternatives like
+        {option1|option2|option3}
+        and all
+        of them
+        will be
+        used
 
-    For
-    example https://namekis.com/{docA|doc2}/{1-3}
-    will generate
-    the following urls:https://namekis.com/docA/1
-    https://namekis.com/docA/2
-    https://namekis.com/docA/3
-    https://namekis.com/doc2/1
-    https://namekis.com/doc2/2
-    https://namekis.com/doc2/3
-    """)
+        For
+        example https://namekis.com/{docA|doc2}/{1-3}
+        will generate
+        the following urls:https://namekis.com/docA/1
+        https://namekis.com/docA/2
+        https://namekis.com/docA/3
+        https://namekis.com/doc2/1
+        https://namekis.com/doc2/2
+        https://namekis.com/doc2/3
+        """)
     public String generator;
     @picocli.CommandLine.Option(names = { "-v", "--verbosity" },
         description = "Set the verbosity level: ${COMPLETION-CANDIDATES}.",
@@ -430,8 +429,8 @@ public class JCrawler {
     return result;
   }
 
-  public static void mainOne(String args) {
-    main(split(args));
+  public static void mainOne(String args, boolean exitAtEnd) {
+    main(split(args), exitAtEnd);
   }
 
   private static String[] split(String cmdWithSpaces) {
@@ -441,6 +440,10 @@ public class JCrawler {
   }
 
   public static void main(String[] args) {
+    main(args, true);
+  }
+
+  private static void main(String[] args, boolean exitAtEnd) {
     IExecutionExceptionHandler errorHandler = (ex, cmd, parseResult) -> {
       Crawler config = cmd.getCommand();
       if (config.debug) {
@@ -461,6 +464,8 @@ public class JCrawler {
     CommandLine gen = cmd.getSubcommands().get("generate-completion");
     gen.getCommandSpec().usageMessage().hidden(false);
     int exitCode = cmd.execute(args);
-    System.exit(exitCode);
+    if (exitAtEnd) {
+      System.exit(exitCode);
+    }
   }
 }

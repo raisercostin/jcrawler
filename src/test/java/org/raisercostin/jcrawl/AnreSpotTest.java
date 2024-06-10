@@ -21,6 +21,7 @@ import io.vavr.Tuple2;
 import io.vavr.collection.Iterator;
 import io.vavr.collection.Seq;
 import lombok.ToString;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.raisercostin.jcrawl.JCrawler.Crawler;
 import org.raisercostin.jedio.Locations;
@@ -411,6 +412,7 @@ public class AnreSpotTest {
   }
 
   @Test
+  @Tag("bug") //yet to deduplicate more
   void testdedup() {
     String result = deduplicate2(
       """

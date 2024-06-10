@@ -9,6 +9,27 @@ import io.vavr.control.Try;
 import lombok.val;
 import org.apache.commons.lang3.StringUtils;
 
+/**
+ Responsibility to create filenames from urls.
+ Filenames have some distinct limitations so is important to have a solution that is
+ - deterministic
+ - low collision (two different urls not to map to same slug)
+ - human readability - important details to be present for human reading
+ - respect filename limits on filesystems in windows/linux/osx: for example utf8?, max filenmae length, etc.
+ - [future] respect reversed hostname and dir/path structure since this will improve human readability and lower the collisions
+
+Current implementation is by truncating and adding some low collision hash(sha256) of entire url.
+
+For example:
+```
+https://posf.ro/comparator/api/index.php?request=comparator-electric&tip_oferta=2&data_start_aplicare=02-06-2024&tip_client=casnic&tip_pret=nediferentiat&consum_anual=1200&consum_lunar=100&valoare_factura_curenta=&nivel_tensiune=JT_&tip_produs=0&perioada_contract=&energie_regenerabila=&factura_electronica=&frecventa_emitere_factura=&procent_zona_noapte=&procent_zona_zi=&frecventa_citire_contor=&valoare_fixa=&denumire_furnizor=&id_zona=8
+
+converted to slug
+
+https-----posf--ro--comparator--api--index--php-request=comparator-ele-#8e0719e7b-ctric-tip-oferta=2-data-start-aplic--and-more--sha256-8e0719e7b97f46b0855f9e00932ea6495f227cdb7c5e1cc26ab942e271a56bcb
+```
+
+ */
 public class SlugEscape {
   private static final String MAX_FS_FILENAME_REACHED_SUFFIX = "--and-more";
   private static final int MAX_FS_FILENAME_LENGTH = 200;
