@@ -8,7 +8,7 @@
   </parent>
   <groupId>org.raisercostin</groupId>
   <artifactId>jcrawl</artifactId>
-  <version>0.1-SNAPSHOT</version>
+  <version>0.1</version>
   <description>Crawler tool and java fluent library.</description>
   <url>${git.url}</url>
   <licenses>
@@ -28,7 +28,7 @@
   <scm>
     <connection>${scm.connection.url}</connection>
     <developerConnection>${scm.connection.url}</developerConnection>
-    <tag>namek-jcrawl-0.1</tag>
+    <tag>jcrawl-0.1</tag>
     <url>${git.url}</url>
   </scm>
   <issueManagement>
