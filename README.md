@@ -1,6 +1,6 @@
 # jcrawler
 
-Fluent java crawling utility and library.
+Crawler tool and java fluent library.
 
 ## CLI Usage
 

@@ -8,9 +8,9 @@
     <version>1.23</version>
   </parent>
   <groupId>org.raisercostin</groupId>
-  <artifactId>namek-jcrawl</artifactId>
-  <version>0.1</version>
-  <description>Simple crawler in java</description>
+  <artifactId>jcrawl</artifactId>
+  <version>0.1-SNAPSHOT</version>
+  <description>Crawler tool and java fluent library.</description>
   <url>${git.url}</url>
   <licenses>
     <license>
