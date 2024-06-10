@@ -111,7 +111,7 @@ class JCrawlerTest {
   @Test
   void testMain() {
     //JCrawler.mainOne("https://legislatie.just.ro/Public/DetaliiDocument/1 --debug --protocol=HTTP11 --expire PT1S");
-    JCrawler.mainOne("", false);
+    JCrawler.mainOne("--protocol=H2C --protocol=H2", false);
   }
 
   @Test

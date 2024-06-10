@@ -19,7 +19,6 @@ import io.vavr.collection.Set;
 import io.vavr.collection.Traversable;
 import io.vavr.control.Option;
 import lombok.AllArgsConstructor;
-import lombok.NoArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.ToString;
 import lombok.With;
@@ -46,16 +45,58 @@ import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Help.Visibility;
 import picocli.CommandLine.IExecutionExceptionHandler;
+import picocli.CommandLine.Model.CommandSpec;
+import picocli.CommandLine.Spec;
 import reactor.netty.http.HttpProtocol;
 
 @AllArgsConstructor
-@NoArgsConstructor
 @ToString
 @With
 @Command(name = "jcrawl", mixinStandardHelpOptions = true, version = "jcrawl 0.1",
-    description = "Crawl tool.", subcommands = GenerateCompletion.class)
+    description = "Crawl tool.", subcommands = GenerateCompletion.class, usageHelpAutoWidth = true,
+    usageHelpWidth = 120)
 @Slf4j
 public class JCrawler implements Callable<Integer> {
+  public static void main(String[] args) {
+    main(args, true);
+  }
+
+  public static void mainOne(String args, boolean exitAtEnd) {
+    main(split(args), exitAtEnd);
+  }
+
+  private static String[] split(String cmdWithSpaces) {
+    StringTokenizer tokenizer = new StringTokenizer(cmdWithSpaces, ' ', '"');
+    tokenizer.setIgnoreEmptyTokens(true);
+    return tokenizer.getTokenArray();
+  }
+
+  private static void main(String[] args, boolean exitAtEnd) {
+    IExecutionExceptionHandler errorHandler = (ex, cmd, parseResult) -> {
+      JCrawler config = cmd.getCommand();
+      if (config.debug) {
+        ex.printStackTrace(cmd.getErr()); // Print stack trace to the error stream
+      } else {
+        cmd.getErr()
+          .println(
+            cmd.getColorScheme()
+              .errorText(ex.getMessage() + ". Use --debug to see stacktrace."));
+      }
+      cmd.getErr().println(cmd.getColorScheme().errorText("Use --help or -h for usage."));
+      return cmd.getExitCodeExceptionMapper() != null
+          ? cmd.getExitCodeExceptionMapper().getExitCode(ex)
+          : cmd.getCommandSpec().exitCodeOnExecutionException();
+    };
+
+    CommandLine cmd = new CommandLine(new JCrawler()).setExecutionExceptionHandler(errorHandler);
+    CommandLine gen = cmd.getSubcommands().get("generate-completion");
+    gen.getCommandSpec().usageMessage().hidden(false);
+    int exitCode = cmd.execute(args);
+    if (exitAtEnd) {
+      System.exit(exitCode);
+    }
+  }
+
   public static JCrawler crawler() {
     return new JCrawler();
   }
@@ -67,8 +108,30 @@ public class JCrawler implements Callable<Integer> {
         .map(z -> z.withoutQuery())
         .toSet());
     Seq<String> start = webLocation.ls().map(x -> x.asHttpClientLocation().toExternalForm()).toList();
-    return new JCrawler(TraversalType.BREADTH_FIRST, Nodes.json, start, cache, webLocation, start.toSet(),
+    return new JCrawler(null, TraversalType.BREADTH_FIRST, Nodes.json, start, cache, webLocation, start.toSet(),
       whitelist, -1, 3, null, Duration.ofDays(100), null, Verbosity.INFO, false);
+  }
+
+  private static Pattern exp(String sep) {
+    return Pattern
+      .compile("(?i)(?s)<a[^>]*\\s+href=" + sep + "([^" + sep + "#]*)(#[^" + sep + "]*)?" + sep + "[^>]*>(.*?)</a>");
+    //regular expressions with named group consumes 17% of all time
+    //("href", "text")
+  }
+
+  private final static Seq<Pattern> allExp = API.Seq(exp("'"), exp("\\\""));
+
+  private static io.vavr.collection.Iterator<HyperLink> extractLinksFromContent(final String content, String source,
+      String sourceUrl) {
+    io.vavr.collection.Iterator<HyperLink> result;
+    result = allExp.iterator().flatMap(exp -> {
+      io.vavr.collection.Iterator<Matcher> all = io.vavr.collection.Iterator.continually(exp.matcher(content))
+        .takeWhile(matcher -> matcher.find());
+      return all.map(
+        m -> HyperLink.of(m.group(1).trim(), m.group(3).trim(), m.group(2), m.group().trim(), sourceUrl,
+          source));
+    });
+    return result;
   }
 
   public enum TraversalType {
@@ -116,6 +179,8 @@ public class JCrawler implements Callable<Integer> {
     }
   }
 
+  @Spec
+  private CommandSpec spec; // injected by picocli
   /**Breadth first is usual.*/
   public TraversalType traversalType = TraversalType.BREADTH_FIRST;
   public JacksonNodes linksNodes = Nodes.json;
@@ -141,42 +206,23 @@ public class JCrawler implements Callable<Integer> {
   @picocli.CommandLine.Option(names = { "-p", "--protocol" },
       description = "Set the protocol: ${COMPLETION-CANDIDATES}.",
       showDefaultValue = Visibility.ALWAYS)
-  public HttpProtocol[] protocols;
+  public HttpProtocol[] protocols = { HttpProtocol.H2, HttpProtocol.HTTP11 };
   @picocli.CommandLine.Option(names = { "--expire" },
-      description = "Expiration as a iso 8601 format like P1DT1S. \n Full format P(n)Y(n)M(n)DT(n)H(n)M(n)S\nSee more at https://www.digi.com/resources/documentation/digidocs/90001488-13/reference/r_iso_8601_duration_format.htm")
+      description = "Expiration as a iso 8601 format like P1DT1S. \n Full format P(n)Y(n)M(n)DT(n)H(n)M(n)S\nSee more at https://www.digi.com/resources/documentation/digidocs/90001488-13/reference/r_iso_8601_duration_format.htm",
+      showDefaultValue = Visibility.ALWAYS)
   public Duration cacheExpiryDuration = Duration.ofDays(100);
-  @picocli.CommandLine.Parameters(paramLabel = "urls", description = """
-          Urls to
-      crawl.If urls
-      contain expressions
-      all combinations
-      of that
-      values will
-      be generated:-
-      ranges like
-      {start-end}
-      that will
-      be expanded
-      to all
-      values between
-      start and end.-
-      alternatives like
-      {option1|option2|option3}
-      and all
-      of them
-      will be
-      used
-
-      For
-      example https://namekis.com/{docA|doc2}/{1-3}
-      will generate
-      the following urls:https://namekis.com/docA/1
-      https://namekis.com/docA/2
-      https://namekis.com/docA/3
-      https://namekis.com/doc2/1
-      https://namekis.com/doc2/2
-      https://namekis.com/doc2/3
-      """)
+  @picocli.CommandLine.Parameters(paramLabel = "urls",
+      description = """
+          Urls to crawl. If urls contain expressions all combinations of that values will be generated:
+          - ranges like {start-end}
+          - alternatives like {option1|option2|option3}
+          For example https://namekis.com/{docA|doc2}/{1-3} will generate the following urls:
+          - https://namekis.com/docA/1
+          - https://namekis.com/docA/2
+          - https://namekis.com/docA/3
+          - https://namekis.com/doc2/1
+          - https://namekis.com/doc2/2
+          - https://namekis.com/doc2/3""")
   public String generator;
   @picocli.CommandLine.Option(names = { "-v", "--verbosity" },
       description = "Set the verbosity level: ${COMPLETION-CANDIDATES}.",
@@ -184,6 +230,9 @@ public class JCrawler implements Callable<Integer> {
   public Verbosity verbosity = Verbosity.INFO;
   @picocli.CommandLine.Option(names = { "--debug" }, description = "Show stack trace")
   public boolean debug = false;
+
+  private JCrawler() {
+  }
 
   public boolean accept(HyperLink link) {
     if (exactMatch == null || exactMatch.isEmpty() || exactMatch.get().isEmpty()) {
@@ -214,6 +263,8 @@ public class JCrawler implements Callable<Integer> {
 
   @Override
   public Integer call() throws Exception {
+    CommandLine.Help help = new CommandLine.Help(spec);
+    System.out.println(help.optionList());
     crawl().forEach(System.out::println);
     return 0;
   }
@@ -401,68 +452,6 @@ public class JCrawler implements Callable<Integer> {
       String c = nodes.toString(all);
       metaLinks.asWritableFile().write(c);
       return all;
-    }
-  }
-
-  private static Pattern exp(String sep) {
-    return Pattern
-      .compile("(?i)(?s)<a[^>]*\\s+href=" + sep + "([^" + sep + "#]*)(#[^" + sep + "]*)?" + sep + "[^>]*>(.*?)</a>");
-    //regular expressions with named group consumes 17% of all time
-    //("href", "text")
-  }
-
-  private final static Seq<Pattern> allExp = API.Seq(exp("'"), exp("\\\""));
-
-  private static io.vavr.collection.Iterator<HyperLink> extractLinksFromContent(final String content, String source,
-      String sourceUrl) {
-    io.vavr.collection.Iterator<HyperLink> result;
-    result = allExp.iterator().flatMap(exp -> {
-      io.vavr.collection.Iterator<Matcher> all = io.vavr.collection.Iterator.continually(exp.matcher(content))
-        .takeWhile(matcher -> matcher.find());
-      return all.map(
-        m -> HyperLink.of(m.group(1).trim(), m.group(3).trim(), m.group(2), m.group().trim(), sourceUrl,
-          source));
-    });
-    return result;
-  }
-
-  public static void mainOne(String args, boolean exitAtEnd) {
-    main(split(args), exitAtEnd);
-  }
-
-  private static String[] split(String cmdWithSpaces) {
-    StringTokenizer tokenizer = new StringTokenizer(cmdWithSpaces, ' ', '"');
-    tokenizer.setIgnoreEmptyTokens(true);
-    return tokenizer.getTokenArray();
-  }
-
-  public static void main(String[] args) {
-    main(args, true);
-  }
-
-  private static void main(String[] args, boolean exitAtEnd) {
-    IExecutionExceptionHandler errorHandler = (ex, cmd, parseResult) -> {
-      JCrawler config = cmd.getCommand();
-      if (config.debug) {
-        ex.printStackTrace(cmd.getErr()); // Print stack trace to the error stream
-      } else {
-        cmd.getErr()
-          .println(
-            cmd.getColorScheme()
-              .errorText(ex.getMessage() + ". Use --debug to see stacktrace."));
-      }
-      cmd.getErr().println(cmd.getColorScheme().errorText("Use --help or -h for usage."));
-      return cmd.getExitCodeExceptionMapper() != null
-          ? cmd.getExitCodeExceptionMapper().getExitCode(ex)
-          : cmd.getCommandSpec().exitCodeOnExecutionException();
-    };
-
-    CommandLine cmd = new CommandLine(new JCrawler()).setExecutionExceptionHandler(errorHandler);
-    CommandLine gen = cmd.getSubcommands().get("generate-completion");
-    gen.getCommandSpec().usageMessage().hidden(false);
-    int exitCode = cmd.execute(args);
-    if (exitAtEnd) {
-      System.exit(exitCode);
     }
   }
 }

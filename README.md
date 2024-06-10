@@ -1,8 +1,8 @@
 # jcrawler
 
-Fluent java crawling library and utility.
+Fluent java crawling utility and library.
 
-## Executable Usage
+## CLI Usage
 
 ```cli
 jcrawl
@@ -205,6 +205,8 @@ static void main(){
   - [ ] jsoup convert
 
 ## Competition
+
+- <https://scrapy.org/>
 
 ## Development
 
