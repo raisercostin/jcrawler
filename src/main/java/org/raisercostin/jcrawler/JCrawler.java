@@ -6,10 +6,14 @@ import java.time.Instant;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import ch.qos.logback.classic.Level;
+import com.google.common.base.Throwables;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import com.google.common.graph.SuccessorsFunction;
 import com.google.common.graph.Traverser;
 import io.vavr.API;
@@ -25,6 +29,7 @@ import lombok.With;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.text.StringTokenizer;
 import org.checkerframework.checker.nullness.qual.NonNull;
+import org.jedio.RichThrowable;
 import org.jedio.struct.RichIterable;
 import org.raisercostin.jedio.DirLocation;
 import org.raisercostin.jedio.FileLocation;
@@ -58,6 +63,7 @@ import reactor.netty.http.HttpProtocol;
 @Slf4j
 public class JCrawler implements Callable<Integer> {
   public static void main(String[] args) {
+    //mainOne("https://raisercostin.org --traversal=BREADTH_FIRST", true);
     main(args, true);
   }
 
@@ -138,7 +144,7 @@ public class JCrawler implements Callable<Integer> {
     PARALLEL_BREADTH_FIRST {
       @Override
       public <N> Iterable<N> traverse(JCrawler config, Iterable<N> todo, SuccessorsFunction<N> successor) {
-        return new ParallelGraphTraverser<>(config.maxConnections,successor).startTraversal(todo,config.maxDocs);
+        return new ParallelGraphTraverser<>(config.maxConnections, successor).startTraversal(todo, config.maxDocs);
       }
     },
     BREADTH_FIRST {
@@ -181,8 +187,11 @@ public class JCrawler implements Callable<Integer> {
 
   @Spec
   private CommandSpec spec; // injected by picocli
+  @picocli.CommandLine.Option(names = { "-t", "--traversal" },
+      description = "Set the traversal mode: ${COMPLETION-CANDIDATES}.",
+      showDefaultValue = Visibility.ALWAYS)
   /**Breadth first is usual.*/
-  public TraversalType traversalType = TraversalType.BREADTH_FIRST;
+  public TraversalType traversalType = TraversalType.PARALLEL_BREADTH_FIRST;
   public JacksonNodes linksNodes = Nodes.json;
   public Seq<String> start;
 
@@ -199,9 +208,9 @@ public class JCrawler implements Callable<Integer> {
   public WebLocation webLocation;
   public Set<String> children;
   public Option<Set<String>> exactMatch;
-  @picocli.CommandLine.Option(names = { "--maxDocs" })
+  @picocli.CommandLine.Option(names = { "-d", "--maxDocs" })
   public int maxDocs = Integer.MAX_VALUE;
-  @picocli.CommandLine.Option(names = { "--maxConnections" })
+  @picocli.CommandLine.Option(names = { "-c", "--maxConnections" })
   public int maxConnections = 3;
   @picocli.CommandLine.Option(names = { "-p", "--protocol" },
       description = "Set the protocol: ${COMPLETION-CANDIDATES}.",
@@ -213,24 +222,17 @@ public class JCrawler implements Callable<Integer> {
   public Duration cacheExpiryDuration = Duration.ofDays(100);
   @picocli.CommandLine.Parameters(paramLabel = "urls",
       description = """
-          Urls to
-  crawl.If urls
-  contain expressions
-  all combinations
-  of that
-  values will
-  be generated:-
-  ranges like
-  {start-end}-
-  alternatives like
-  {option1|option2|option3}
-  For example https://namekis.com/{docA|doc2}/{1-3} will generate the following urls:
-  -https://namekis.com/docA/1
-  -https://namekis.com/docA/2
-  -https://namekis.com/docA/3
-  -https://namekis.com/doc2/1
-  -https://namekis.com/doc2/2
-  -https://namekis.com/doc2/3""")
+          Urls to crawl.If urls contain expressions all combinations of that values will be generated:
+          - ranges like {start-end}
+          - alternatives like {option1|option2|option3}
+
+          For example https://namekis.com/{docA|doc2}/{1-3} will generate the following urls:
+          - https://namekis.com/docA/1
+          - https://namekis.com/docA/2
+          - https://namekis.com/docA/3
+          - https://namekis.com/doc2/1
+          - https://namekis.com/doc2/2
+          - https://namekis.com/doc2/3""")
   public String generator;
   @picocli.CommandLine.Option(names = { "-v", "--verbosity" },
       description = "Set the verbosity level: ${COMPLETION-CANDIDATES}.",
@@ -240,6 +242,27 @@ public class JCrawler implements Callable<Integer> {
   public boolean debug = false;
 
   private JCrawler() {
+  }
+
+  @Override
+  public Integer call() throws Exception {
+    CommandLine.Help help = new CommandLine.Help(spec);
+    //System.out.println(help.optionList());
+    crawl().forEach(x -> System.out.println(x.externalForm + " -> " + x.localCache));
+    return 0;
+  }
+
+  public RichIterable<HyperLink> crawl() {
+    return crawl(this);
+  }
+
+  /**Crawls eagerly config.maxDocs.*/
+  public static RichIterable<HyperLink> crawl(JCrawler config) {
+    CrawlerWorker worker = new CrawlerWorker(config);
+    if (config.generator != null) {
+      return worker.crawl(Generators.parse(config.generator).generate().map(x -> HyperLink.of(x)));
+    }
+    return worker.crawl(config.start.map(x -> HyperLink.of(x)));
   }
 
   public boolean accept(HyperLink link) {
@@ -269,27 +292,6 @@ public class JCrawler implements Callable<Integer> {
     return withStart(API.Seq(urls));
   }
 
-  @Override
-  public Integer call() throws Exception {
-    CommandLine.Help help = new CommandLine.Help(spec);
-    System.out.println(help.optionList());
-    crawl().forEach(System.out::println);
-    return 0;
-  }
-
-  public RichIterable<String> crawl() {
-    return crawl(this);
-  }
-
-  /**Crawls eagerly config.maxDocs.*/
-  public static RichIterable<String> crawl(JCrawler config) {
-    CrawlerWorker crawler = new CrawlerWorker(config);
-    if (config.generator != null) {
-      return crawler.crawl(Generators.parse(config.generator).generate().map(x -> HyperLink.of(x)));
-    }
-    return crawler.crawl(config.start.map(x -> HyperLink.of(x)));
-  }
-
   public FileLocation slug(HyperLink href) {
     return cachedFile(href.externalForm);
   }
@@ -314,10 +316,13 @@ public class JCrawler implements Callable<Integer> {
     public final WebClientFactory client;
     //public final java.util.concurrent.Semaphore semaphore;
     public final BlockingQueue<String> tokenQueue;
+    public final Cache<String, String> failingServers = CacheBuilder.newBuilder()
+      .expireAfterWrite(10, TimeUnit.MINUTES)
+      .build();
 
     public CrawlerWorker(JCrawler config) {
       this.config = config;
-      this.client = new WebClientFactory(config.protocols);
+      this.client = new WebClientFactory("jcrawler", config.protocols);
       //this.semaphore = new Semaphore(config.maxConnections);
       this.tokenQueue = new ArrayBlockingQueue<>(config.maxConnections);
 
@@ -327,26 +332,29 @@ public class JCrawler implements Callable<Integer> {
       }
     }
 
-    private RichIterable<String> crawl(Traversable<HyperLink> todo) {
+    private RichIterable<HyperLink> crawl(Traversable<HyperLink> todo) {
       Iterable<HyperLink> all = config.traversalType.traverse(config, todo, this::downloadAndExtractLinks);
       return RichIterable.ofAll(all)
-        .map(x -> x.externalForm)
         .take(config.maxDocs);
     }
 
     @SneakyThrows
     private Traversable<HyperLink> downloadAndExtractLinks(HyperLink href) {
       if (!config.accept(href)) {
-        log.info("ignored [{}]", href.externalForm);
-        return io.vavr.collection.Iterator.empty();
+        log.debug("ignored [{}]", href.externalForm);
+        return API.Seq();
       }
+      String hostname = href.hostname();
+      if (failingServers.getIfPresent(hostname) != null) {
+        log.debug("ignored failing server for a while [{}]", href.externalForm);
+        return API.Seq();
+      }
+      WritableFileLocation dest = config.slug(href).asWritableFile();
       try {
-        WritableFileLocation dest = config.slug(href).asWritableFile();
-
         Traversable<HyperLink> links = null;
-        boolean exists = dest.exists();
-        boolean forcedDownload = exists && config.forceDownload(href, dest);
         ReferenceLocation metaJson = dest.meta("", ".meta.json");
+        boolean exists = dest.exists() && metaJson.exists();
+        boolean forcedDownload = exists && config.forceDownload(href, dest);
         if (!exists || forcedDownload) {
           String token = tokenQueue.take();
           //semaphore.acquire();
@@ -354,24 +362,33 @@ public class JCrawler implements Callable<Integer> {
           try {
             //check writing before downloading
             //dest.touch();
-            dest.write("");
-            log.info("download from url #{} [{}]", token, href.externalForm);
-            RequestResponse content = client.get(href.externalForm).readCompleteContentSync(null);
-            String body = content.getBody();
-            dest.write(body);
-            Metadata metadata = content.getMetadata();
-            metaJson.asPathLocation().write(content.computeMetadata(metadata));
-            links = extractLinksInMemory(body, dest, metadata);
+            metaJson.asPathLocation().write("").deleteFile();
+            dest.write("").deleteFile();
+            log.debug("download from url #{} [{}]", token, href.externalForm);
+            try {
+              RequestResponse content = client.get(href.externalForm).readCompleteContentSync(null);
+              String body = content.getBody();
+              dest.write(body);
+              Metadata metadata = content.getMetadata();
+              metaJson.asPathLocation().write(content.computeMetadata(metadata));
+              links = extractLinksInMemory(body, dest, metadata);
+            } catch (Exception e) {
+              log.info("mark failing server[{}]: {}", hostname, Throwables.getRootCause(e).getMessage());
+              failingServers.put(hostname, href.externalForm);
+              metaJson.asPathLocation()
+                .write(Nodes.json.toString(Metadata.error(href.externalForm, e)));
+              links = API.Seq();
+            }
           } finally {
             log.info("download from url #{} done [{}]", token, href.externalForm);
             tokenQueue.put(token);
           }
         } else {
           try {
-            log.info("download from cache [{}]", href.externalForm);
+            log.debug("download from cache [{}]", href.externalForm);
             links = extractLinksFromDisk(dest, metaJson);
           } finally {
-            log.info("download from cache done [{}]", href.externalForm);
+            log.debug("download from cache done [{}]", href.externalForm);
           }
         }
         //Locations.url(link)
@@ -389,21 +406,21 @@ public class JCrawler implements Callable<Integer> {
           .groupBy(x -> x.externalForm)
           .map(x -> x._2.head());
       } catch (Exception e) {
-        Throwable root = com.google.common.base.Throwables.getRootCause(e);
+        Throwable root = Throwables.getRootCause(e);
         if (root != null) {
           if (root instanceof SocketException e3 && e3.getMessage().equals("Connection reset")) {
             throw e;
           }
         }
         //TODO write in meta the error?
-        log.error("couldn't extract links from {}", href.externalForm, e);
+        log.error("Couldn't extract links from {} - {}", dest.absoluteAndNormalized(), href.externalForm, e);
         return io.vavr.collection.Iterator.empty();
       }
     }
 
     private Traversable<HyperLink> extractLinksFromDisk(WritableFileLocation source, ReferenceLocation metaJson) {
       String metaContent = metaJson.asReadableFile().readContent();
-      Metadata meta = Nodes.json.toObject(metaContent, Metadata.class);
+      Metadata meta = metaContent.isEmpty() ? new Metadata() : Nodes.json.toObject(metaContent, Metadata.class);
       String content = source.asReadableFile().readContent();
       return extractLinksInMemory(content, source, meta);
     }
@@ -413,6 +430,9 @@ public class JCrawler implements Callable<Integer> {
     //<base href="http://www.cartierbratieni.ro/" />
     private Traversable<HyperLink> extractLinksInMemory(String content, WritableFileLocation source,
         Metadata meta) {
+      if (meta.responseHeaders == null) {
+        return API.Seq();
+      }
       JacksonNodes nodes = config.linksNodes;
       ReferenceLocation metaLinks = source.meta("", ".links.json");
       if (metaLinks.exists()) {
@@ -435,10 +455,10 @@ public class JCrawler implements Callable<Integer> {
         }
       }
       //Option<String> contentType = meta.responseHeaders.getContentType()==MediaType.TEXT_HTML;
-      boolean isHtmlAnd200 = meta.responseHeaders.getContentType().getType().equals(MediaType.TEXT_HTML.getType())
-          &&
-          meta.statusCodeValue == 200;
-      log.info("searching links in [{}] from {}", meta.responseHeaders.getContentType(), source);
+      MediaType contentType = meta.responseHeaders.getContentType();
+      boolean isHtmlAnd200 = meta.statusCodeValue == 200 && contentType != null
+          && contentType.getType().equals(MediaType.TEXT_HTML.getType());
+      log.info("searching links in [{}] from {}", contentType, source);
       String sourceUrl = meta.url;
       //String sourceUrl = meta2.httpMetaRequestUri().get();
       io.vavr.collection.Iterator<HyperLink> result = isHtmlAnd200
@@ -450,8 +470,8 @@ public class JCrawler implements Callable<Integer> {
         //String sourceUrl = meta2.httpMetaRequestUri().get();
         all = all
           .append(
-            HyperLink.of(meta.responseHeaders.getLocation().toString(), "Moved Permanently - 301", null, "", sourceUrl,
-              source.toExternalForm()));
+            HyperLink.of(meta.responseHeaders.getLocation().toString(), "Moved - http status " + status, null, "",
+              sourceUrl, source.toExternalForm()));
       }
       //      YAMLMapper mapper = Nodes.yml.mapper();
       //      mapper.configure(YAMLGenerator.Feature.LITERAL_BLOCK_STYLE, true);

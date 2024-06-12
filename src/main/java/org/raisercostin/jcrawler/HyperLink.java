@@ -4,6 +4,7 @@ import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+import lombok.SneakyThrows;
 import lombok.ToString;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
@@ -51,5 +52,10 @@ public class HyperLink {
 
   public String withoutQuery() {
     return SimpleUrl.from(externalForm).withoutQuery().toExternalForm();
+  }
+
+  @SneakyThrows
+  public String hostname() {
+    return SimpleUrl.from(externalForm).uri.getHost();
   }
 }

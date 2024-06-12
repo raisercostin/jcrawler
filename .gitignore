@@ -36,3 +36,4 @@
 /bin/
 /node_modules
 /.crawl
+/.logs

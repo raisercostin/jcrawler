@@ -208,6 +208,18 @@ static void main(){
 
 ## History
 
+- [ ] 2024-06-11
+  - extension from content type if not exists in url
+    - cache hit will be detected by hash that doesn't consider extension?
+  - cache for servers with errors
+  - no logs if not enabled by command line
+  - use blocking standard java http client (in java21 virtual threads will help)
+  - ignore #fragments from urls
+- [x] 2024-06-10
+  - open source on github.com
+  - fat jar release
+  - installer via scoop
+  - [ ] allowedDomain is computed based on the start urls
 - [x] 2024-05-06 - added generators like: https://legislatie.just.ro/Public/{DetaliiDocument|DetaliiDocumentAfis}/{1-3}
   - Or between `{` abd `}` separated with `|`
   - Range between `{` abd `}` separated with `-`

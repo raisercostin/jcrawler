@@ -228,6 +228,7 @@ public class AnreSpotTest {
         String offer = crawler
           .withGenerator(url1 + "&id_zona={" + zone + "}")
           .crawl()
+          .map(x -> x.externalForm)
           .map(tap(x -> System.out.println("oferte " + x)))
           .head();
         return Tuple.of(zone, offer);

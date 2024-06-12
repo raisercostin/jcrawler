@@ -79,7 +79,8 @@ class JCrawlerTest {
       .withTraversalType(TraversalType.PARALLEL_BREADTH_FIRST)
       //.withGenerator("https://legislatie.just.ro/Public/{DetaliiDocument|DetaliiDocumentAfis}/{1-3}")
       .withGenerator("https://legislatie.just.ro/Public/DetaliiDocumentAfis/{1000-1010}")
-      .crawl();
+      .crawl()
+      .map(x -> x.externalForm);
 
     String actual = all.sorted().mkString("\n");
     assertThat(actual).isEqualTo(
@@ -97,7 +98,8 @@ class JCrawlerTest {
   void testLegeDepthFirstPreorder() {
     RichIterable<String> all = crawler
       .withTraversalType(TraversalType.DEPTH_FIRST_PREORDER)
-      .crawl();
+      .crawl()
+      .map(x -> x.externalForm);
 
     assertThat(all.mkString("\n")).isEqualTo(
       """
@@ -111,7 +113,7 @@ class JCrawlerTest {
   @Test
   void testMain() {
     //JCrawler.mainOne("https://legislatie.just.ro/Public/DetaliiDocument/1 --debug --protocol=HTTP11 --expire PT1S");
-    JCrawler.mainOne("--protocol=H2C --protocol=H2", false);
+    JCrawler.mainOne("https://raisercostin.org --traversal=BREADTH_FIRST", false);
   }
 
   @Test
