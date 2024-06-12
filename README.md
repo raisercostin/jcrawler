@@ -13,49 +13,51 @@ scoop install https://github.com/raisercostin/jcrawler/raw/master/jcrawler.json
 ```cli
 jcrawl
 
-Usage: jcrawl [-hV] [--debug] [--expire=<cacheExpiryDuration>]
-              [--maxConnections=<maxConnections>] [--maxDocs=<maxDocs>]
-              [-o=<cache>] [-v=<verbosity>] [-p=<protocols>]... urls [COMMAND]
-Crawl tool.
-      urls                  Urls to crawl. If urls contain expressions all
-                              combinations of that values will be generated:
-                            - ranges like {start-end} that will be expanded to
-                              all values between start and end.
-                            - alternatives like {option1|option2|option3} and
-                              all of them will be used
+Usage: jcrawl [-hV] [--debug] [--accept=<accept>] [--acceptHostname=<acceptHostname>] [-c=<maxConnections>]
+              [-d=<maxDocs>] [--expire=<cacheExpiryDuration>] [-p=<projectDir>] [-t=<traversalType>] [-v=<verbosity>]
+              [--protocol=<protocols>]... urls
+Crawler tool.
+      urls                  Urls to crawl. If urls contain expressions all combinations of that values will be
+                              generated:
+                            - ranges like {start-end}
+                            - alternatives like {option1|option2|option3}
 
-                            For example
-                              https://namekis.com/{docA|doc2}/{1-3}
-                            will generate the following urls:
-                              https://namekis.com/docA/1
-                              https://namekis.com/docA/2
-                              https://namekis.com/docA/3
-                              https://namekis.com/doc2/1
-                              https://namekis.com/doc2/2
-                              https://namekis.com/doc2/3
-
+                            For example https://namekis.com/{docA|doc2}/{1-3} will generate the following urls:
+                            - https://namekis.com/docA/1
+                            - https://namekis.com/docA/2
+                            - https://namekis.com/docA/3
+                            - https://namekis.com/doc2/1
+                            - https://namekis.com/doc2/2
+                            - https://namekis.com/doc2/3
+      --accept=<accept>     Additional urls to accept.
+      --acceptHostname=<acceptHostname>
+                            Template to accept urls with this prefix.
+                              Default: {http|https}://{www.|}%s
+  -c, --maxConnections=<maxConnections>
+                              Default: 3
+  -d, --maxDocs=<maxDocs>     Default: 10000
       --debug               Show stack trace
       --expire=<cacheExpiryDuration>
                             Expiration as a iso 8601 format like P1DT1S.
                              Full format P(n)Y(n)M(n)DT(n)H(n)M(n)S
                             See more at https://www.digi.
-                              com/resources/documentation/digidocs/90001488-13/r
-                              eference/r_iso_8601_duration_format.htm
+                              com/resources/documentation/digidocs/90001488-13/reference/r_iso_8601_duration_format.htm
+                              Default: PT2400H
   -h, --help                Show this help message and exit.
-      --maxConnections=<maxConnections>
-
-      --maxDocs=<maxDocs>
-  -o, --outdir=<cache>      Dir to write crawled content
-  -p, --protocol=<protocols>
+  -p, --project=<projectDir>
+                            Project dir for config and crawled content.
+                              Default: D:/home/raiser/work/namek-jcrawl/.jcrawler
+      --protocol=<protocols>
                             Set the protocol: HTTP11, H2, H2C.
-                              Default: null
+                              Default: [H2, HTTP11]
+  -t, --traversal=<traversalType>
+                            Set the traversal mode: PARALLEL_BREADTH_FIRST, BREADTH_FIRST, DEPTH_FIRST_PREORDER,
+                              DEPTH_FIRST_POSTORDER.
+                              Default: PARALLEL_BREADTH_FIRST
   -v, --verbosity=<verbosity>
-                            Set the verbosity level: NONE, ERROR, WARN, INFO,
-                              DEBUG, TRACE.
-                              Default: INFO
+                            Set the verbosity level: NONE, ERROR, WARN, INFO, DEBUG, TRACE.
+                              Default: WARN
   -V, --version             Print version information and exit.
-Commands:
-  generate-completion  Generate bash/zsh completion script for jcrawl.
 ```
 
 ## Library Usage
@@ -214,6 +216,7 @@ static void main(){
     - cache hit will be detected by hash that doesn't consider extension?
   - use blocking standard java http client (in java21 virtual threads will help)
   - ignore #fragments from urls
+  - reuse project config or overwrite some params
 - 2024-06-12
 - - write `<project>/.crawl-config.yml`
   - accepts hostnames from urls

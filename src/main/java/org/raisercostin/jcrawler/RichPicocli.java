@@ -2,15 +2,28 @@ package org.raisercostin.jcrawler;
 
 import io.vavr.collection.Array;
 import io.vavr.collection.Seq;
+import lombok.AllArgsConstructor;
+import org.raisercostin.jedio.DirLocation;
 import org.raisercostin.jedio.Location;
 import org.raisercostin.jedio.Locations;
 import picocli.CommandLine;
 
 public class RichPicocli {
-  public static class LocationConverter implements CommandLine.ITypeConverter<Location> {
+  /**Default value for projectDir uses toString so this wrapper is for this.*/
+  @AllArgsConstructor
+  public static class PicocliDir {
+    public DirLocation dir;
+
     @Override
-    public Location convert(String value) throws Exception {
-      return Locations.path(value);
+    public String toString() {
+      return dir.absoluteAndNormalized();
+    }
+  }
+
+  public static class LocationConverter implements CommandLine.ITypeConverter<PicocliDir> {
+    @Override
+    public PicocliDir convert(String value) throws Exception {
+      return new PicocliDir(Locations.path(value));
     }
   }
 

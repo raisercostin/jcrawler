@@ -24,7 +24,6 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.base.Throwables;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
-import com.google.common.collect.Sets;
 import com.google.common.graph.SuccessorsFunction;
 import com.google.common.graph.Traverser;
 import io.vavr.API;
@@ -40,11 +39,11 @@ import lombok.SneakyThrows;
 import lombok.ToString;
 import lombok.With;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.text.StringTokenizer;
 import org.checkerframework.checker.nullness.qual.NonNull;
 import org.jedio.struct.RichIterable;
 import org.raisercostin.jcrawler.RichPicocli.LocationConverter;
+import org.raisercostin.jcrawler.RichPicocli.PicocliDir;
 import org.raisercostin.jcrawler.RichPicocli.VavrConverter;
 import org.raisercostin.jedio.DirLocation;
 import org.raisercostin.jedio.FileLocation;
@@ -53,7 +52,7 @@ import org.raisercostin.jedio.ReadableFileLocation;
 import org.raisercostin.jedio.ReferenceLocation;
 import org.raisercostin.jedio.WritableFileLocation;
 import org.raisercostin.jedio.op.DeleteOptions;
-import org.raisercostin.jedio.op.DeleteOptions.SimpleDeleteOptions;
+import org.raisercostin.jedio.path.PathLocation;
 import org.raisercostin.jedio.url.WebClientLocation2.RequestResponse;
 import org.raisercostin.jedio.url.WebClientLocation2.RequestResponse.Metadata;
 import org.raisercostin.jedio.url.WebClientLocation2.WebClientFactory;
@@ -65,7 +64,6 @@ import org.springframework.http.MediaType;
 import picocli.AutoComplete.GenerateCompletion;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.Help.Visibility;
 import picocli.CommandLine.IExecutionExceptionHandler;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Spec;
@@ -75,11 +73,13 @@ import reactor.netty.http.HttpProtocol;
 @ToString
 @With
 @Command(name = "jcrawl", mixinStandardHelpOptions = true, version = "jcrawl 0.1",
-    description = "Crawl tool.", subcommands = GenerateCompletion.class, usageHelpAutoWidth = true,
-    usageHelpWidth = 120)
+    description = "Crawler tool.",
+    //subcommands = GenerateCompletion.class,
+    usageHelpAutoWidth = true, usageHelpWidth = 120, showDefaultValues = true)
 @Slf4j
 public class JCrawler implements Callable<Integer> {
   public static void main(String[] args) {
+    //mainOne("", true);
     //mainOne("--debug", true);
     //mainOne("https://raisercostin.org --traversal=BREADTH_FIRST", true);
     main(args, true);
@@ -114,8 +114,8 @@ public class JCrawler implements Callable<Integer> {
     };
 
     CommandLine cmd = new CommandLine(new JCrawler()).setExecutionExceptionHandler(errorHandler);
-    CommandLine gen = cmd.getSubcommands().get("generate-completion");
-    gen.getCommandSpec().usageMessage().hidden(false);
+    //CommandLine gen = cmd.getSubcommands().get("generate-completion");
+    //gen.getCommandSpec().usageMessage().hidden(false);
     int exitCode = cmd.execute(args);
     if (exitAtEnd) {
       System.exit(exitCode);
@@ -137,8 +137,9 @@ public class JCrawler implements Callable<Integer> {
     return of(cache, urls).withAdditionalAccepts(whitelist2);
   }
 
-  private static JCrawler of(DirLocation cache, Seq<String> urls) {
-    JCrawler crawler = new JCrawler(null, TraversalType.BREADTH_FIRST, Nodes.json, cache, -1, 3, null,
+  private static JCrawler of(DirLocation projectDir, Seq<String> urls) {
+    JCrawler crawler = new JCrawler(null, TraversalType.BREADTH_FIRST, Nodes.json, new PicocliDir(projectDir), -1, 3,
+      null,
       Duration.ofDays(100), null, null, Verbosity.INFO, false, null).withUrlsAndAccept(urls);
     return crawler;
   }
@@ -238,28 +239,27 @@ public class JCrawler implements Callable<Integer> {
   @JsonIgnore
   private CommandSpec spec; // injected by picocli
   @picocli.CommandLine.Option(names = { "-t", "--traversal" },
-      description = "Set the traversal mode: ${COMPLETION-CANDIDATES}.",
-      showDefaultValue = Visibility.ALWAYS)
+      description = "Set the traversal mode: ${COMPLETION-CANDIDATES}.")
   public TraversalType traversalType = TraversalType.PARALLEL_BREADTH_FIRST;
+  @JsonIgnore
   public JacksonNodes linksNodes = Nodes.json;
-  @picocli.CommandLine.Option(names = { "-p", "--project" }, description = "Project dir for config and crawled content",
-      converter = LocationConverter.class, showDefaultValue = Visibility.ALWAYS)
-  public DirLocation projectDir = Locations.current().child(".jcrawler");
+  @picocli.CommandLine.Option(names = { "-p", "--project" },
+      description = "Project dir for config and crawled content.",
+      converter = LocationConverter.class)
+  public PicocliDir projectDir = new PicocliDir(Locations.current().child(".jcrawler"));
   @picocli.CommandLine.Option(names = { "-d", "--maxDocs" })
-  public int maxDocs = Integer.MAX_VALUE;
+  public int maxDocs = 10_000;
   @picocli.CommandLine.Option(names = { "-c", "--maxConnections" })
   public int maxConnections = 3;
   @picocli.CommandLine.Option(names = { "--protocol" },
-      description = "Set the protocol: ${COMPLETION-CANDIDATES}.",
-      showDefaultValue = Visibility.ALWAYS)
+      description = "Set the protocol: ${COMPLETION-CANDIDATES}.")
   public HttpProtocol[] protocols = { HttpProtocol.H2, HttpProtocol.HTTP11 };
   @picocli.CommandLine.Option(names = { "--expire" },
-      description = "Expiration as a iso 8601 format like P1DT1S. \n Full format P(n)Y(n)M(n)DT(n)H(n)M(n)S\nSee more at https://www.digi.com/resources/documentation/digidocs/90001488-13/reference/r_iso_8601_duration_format.htm",
-      showDefaultValue = Visibility.ALWAYS)
+      description = "Expiration as a iso 8601 format like P1DT1S. \n Full format P(n)Y(n)M(n)DT(n)H(n)M(n)S\nSee more at https://www.digi.com/resources/documentation/digidocs/90001488-13/reference/r_iso_8601_duration_format.htm")
   public Duration cacheExpiryDuration = Duration.ofDays(100);
   @picocli.CommandLine.Parameters(paramLabel = "urls",
       description = """
-          Urls to crawl.If urls contain expressions all combinations of that values will be generated:
+          Urls to crawl. If urls contain expressions all combinations of that values will be generated:
           - ranges like {start-end}
           - alternatives like {option1|option2|option3}
 
@@ -275,13 +275,11 @@ public class JCrawler implements Callable<Integer> {
   @picocli.CommandLine.Option(names = { "--accept" }, description = "Additional urls to accept.")
   public Set<String> accept;
   @picocli.CommandLine.Option(names = { "-v", "--verbosity" },
-      description = "Set the verbosity level: ${COMPLETION-CANDIDATES}.",
-      showDefaultValue = Visibility.ALWAYS)
+      description = "Set the verbosity level: ${COMPLETION-CANDIDATES}.")
   public Verbosity verbosity = Verbosity.WARN;
   @picocli.CommandLine.Option(names = { "--debug" }, description = "Show stack trace")
   public boolean debug = false;
-  @picocli.CommandLine.Option(names = { "--acceptHostname" }, description = "Template to accept urls with this prefix.",
-      showDefaultValue = Visibility.ALWAYS)
+  @picocli.CommandLine.Option(names = { "--acceptHostname" }, description = "Template to accept urls with this prefix.")
   public String acceptHostname = "{http|https}://{www.|}%s";
 
   private JCrawler() {
@@ -298,7 +296,7 @@ public class JCrawler implements Callable<Integer> {
 
   public RichIterable<HyperLink> crawl() {
     CrawlerWorker worker = new CrawlerWorker(this);
-    projectDir.child(".crawl-config.yaml")
+    projectDir.dir.child(".crawl-config.yaml")
       .asWritableFile()
       .nonExistingOrElse(x -> x.delete(DeleteOptions.deleteDefault()))
       //.deleteFile(((SimpleDeleteOptions) DeleteOptions.deleteDefault()).withIgnoreNonExisting(true))
@@ -318,7 +316,7 @@ public class JCrawler implements Callable<Integer> {
   }
 
   public FileLocation cachedFile(String url) {
-    return (FileLocation) projectDir.child(SlugEscape.toSlug(url).slug);
+    return (FileLocation) projectDir.dir.child(SlugEscape.toSlug(url).slug);
   }
 
   public FileLocation slug(HyperLink href) {
@@ -338,7 +336,11 @@ public class JCrawler implements Callable<Integer> {
   }
 
   public ReferenceLocation cached(HyperLink href) {
-    return projectDir.child(href.slug().slug);
+    return projectDir.dir.child(href.slug().slug);
+  }
+
+  public JCrawler withProjectPath(PathLocation dir) {
+    return withProjectDir(new PicocliDir(dir));
   }
 
   public JCrawler withUrl(String... urls) {
@@ -358,7 +360,9 @@ public class JCrawler implements Callable<Integer> {
     @JsonIgnore
     public final WebClientFactory client;
     //public final java.util.concurrent.Semaphore semaphore;
+    @JsonIgnore
     public final BlockingQueue<String> tokenQueue;
+    @JsonIgnore
     public final Cache<String, String> failingServers = CacheBuilder.newBuilder()
       .expireAfterWrite(10, TimeUnit.MINUTES)
       .build();

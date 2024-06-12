@@ -202,7 +202,7 @@ public class AnreSpotTest {
     PathLocation projectDir = Locations.dir("d:\\home\\raiser\\work\\_var_namek_jcrawl\\scan6-anre");
     JCrawler crawler = JCrawler
       .crawler()
-      .withProjectDir(projectDir);
+      .withProjectPath(projectDir);
     String[] urls = { judete };
     crawler.withUrl(urls)
       .crawl()
