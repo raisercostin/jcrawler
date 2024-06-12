@@ -199,10 +199,10 @@ public class AnreSpotTest {
   @Test
   void test() {
     String judete = "https://posf.ro/comparator/api/index.php?request=get-judete";
-    PathLocation workdir = Locations.dir("d:\\home\\raiser\\work\\_var_namek_jcrawl\\scan6-anre");
+    PathLocation projectDir = Locations.dir("d:\\home\\raiser\\work\\_var_namek_jcrawl\\scan6-anre");
     JCrawler crawler = JCrawler
       .crawler()
-      .withCache(workdir);
+      .withProjectDir(projectDir);
     String[] urls = { judete };
     crawler.withUrl(urls)
       .crawl()
@@ -257,16 +257,16 @@ public class AnreSpotTest {
 
     String furnizoriContent = Nodes.csv.toString(database.furnizori);
     System.out.println(furnizoriContent);
-    workdir.child("furnizori-" + consumLunar + ".csv").write(furnizoriContent);
+    projectDir.child("furnizori-" + consumLunar + ".csv").write(furnizoriContent);
 
     String oferteContent = Nodes.csv.toString(database.oferte);
     System.out.println(oferteContent);
-    workdir.child("oferte-" + consumLunar + ".csv").write(oferteContent);
+    projectDir.child("oferte-" + consumLunar + ".csv").write(oferteContent);
 
     String allContent = new Yaml().dump(database);
     //allContent = deduplicate2(allContent);
     //String allContent = Nodes.json.toString(allOffers);
-    workdir.child("all.yaml").write(allContent);
+    projectDir.child("all.yaml").write(allContent);
   }
 
   private String deduplicate2(String allContent) {

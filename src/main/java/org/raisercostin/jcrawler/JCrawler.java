@@ -20,6 +20,7 @@ import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.filter.ThresholdFilter;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.Appender;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.base.Throwables;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -52,6 +53,7 @@ import org.raisercostin.jedio.ReadableFileLocation;
 import org.raisercostin.jedio.ReferenceLocation;
 import org.raisercostin.jedio.WritableFileLocation;
 import org.raisercostin.jedio.op.DeleteOptions;
+import org.raisercostin.jedio.op.DeleteOptions.SimpleDeleteOptions;
 import org.raisercostin.jedio.url.WebClientLocation2.RequestResponse;
 import org.raisercostin.jedio.url.WebClientLocation2.RequestResponse.Metadata;
 import org.raisercostin.jedio.url.WebClientLocation2.WebClientFactory;
@@ -233,20 +235,21 @@ public class JCrawler implements Callable<Integer> {
   }
 
   @Spec
+  @JsonIgnore
   private CommandSpec spec; // injected by picocli
   @picocli.CommandLine.Option(names = { "-t", "--traversal" },
       description = "Set the traversal mode: ${COMPLETION-CANDIDATES}.",
       showDefaultValue = Visibility.ALWAYS)
   public TraversalType traversalType = TraversalType.PARALLEL_BREADTH_FIRST;
   public JacksonNodes linksNodes = Nodes.json;
-  @picocli.CommandLine.Option(names = { "-o", "--outdir" }, description = "Dir to write crawled content",
-      converter = LocationConverter.class)
-  public DirLocation cache = Locations.current().child(".crawl");
+  @picocli.CommandLine.Option(names = { "-p", "--project" }, description = "Project dir for config and crawled content",
+      converter = LocationConverter.class, showDefaultValue = Visibility.ALWAYS)
+  public DirLocation projectDir = Locations.current().child(".jcrawler");
   @picocli.CommandLine.Option(names = { "-d", "--maxDocs" })
   public int maxDocs = Integer.MAX_VALUE;
   @picocli.CommandLine.Option(names = { "-c", "--maxConnections" })
   public int maxConnections = 3;
-  @picocli.CommandLine.Option(names = { "-p", "--protocol" },
+  @picocli.CommandLine.Option(names = { "--protocol" },
       description = "Set the protocol: ${COMPLETION-CANDIDATES}.",
       showDefaultValue = Visibility.ALWAYS)
   public HttpProtocol[] protocols = { HttpProtocol.H2, HttpProtocol.HTTP11 };
@@ -269,6 +272,7 @@ public class JCrawler implements Callable<Integer> {
           - https://namekis.com/doc2/3""", converter = VavrConverter.class)
   @With(value = AccessLevel.PRIVATE)
   public Seq<String> urls;
+  @picocli.CommandLine.Option(names = { "--accept" }, description = "Additional urls to accept.")
   public Set<String> accept;
   @picocli.CommandLine.Option(names = { "-v", "--verbosity" },
       description = "Set the verbosity level: ${COMPLETION-CANDIDATES}.",
@@ -276,6 +280,8 @@ public class JCrawler implements Callable<Integer> {
   public Verbosity verbosity = Verbosity.WARN;
   @picocli.CommandLine.Option(names = { "--debug" }, description = "Show stack trace")
   public boolean debug = false;
+  @picocli.CommandLine.Option(names = { "--acceptHostname" }, description = "Template to accept urls with this prefix.",
+      showDefaultValue = Visibility.ALWAYS)
   public String acceptHostname = "{http|https}://{www.|}%s";
 
   private JCrawler() {
@@ -292,6 +298,12 @@ public class JCrawler implements Callable<Integer> {
 
   public RichIterable<HyperLink> crawl() {
     CrawlerWorker worker = new CrawlerWorker(this);
+    projectDir.child(".crawl-config.yaml")
+      .asWritableFile()
+      .nonExistingOrElse(x -> x.delete(DeleteOptions.deleteDefault()))
+      //.deleteFile(((SimpleDeleteOptions) DeleteOptions.deleteDefault()).withIgnoreNonExisting(true))
+      .asWritableFile()
+      .write(Nodes.yml.toString(worker));
     return worker.crawl(
       urls.flatMap(generator -> Generators.parse(generator).generate()).map(x -> HyperLink.of(x)));
   }
@@ -306,7 +318,7 @@ public class JCrawler implements Callable<Integer> {
   }
 
   public FileLocation cachedFile(String url) {
-    return (FileLocation) cache.child(SlugEscape.toSlug(url).slug);
+    return (FileLocation) projectDir.child(SlugEscape.toSlug(url).slug);
   }
 
   public FileLocation slug(HyperLink href) {
@@ -326,7 +338,7 @@ public class JCrawler implements Callable<Integer> {
   }
 
   public ReferenceLocation cached(HyperLink href) {
-    return cache.child(href.slug().slug);
+    return projectDir.child(href.slug().slug);
   }
 
   public JCrawler withUrl(String... urls) {
@@ -343,6 +355,7 @@ public class JCrawler implements Callable<Integer> {
 
   public static class CrawlerWorker {
     public final JCrawler config;
+    @JsonIgnore
     public final WebClientFactory client;
     //public final java.util.concurrent.Semaphore semaphore;
     public final BlockingQueue<String> tokenQueue;

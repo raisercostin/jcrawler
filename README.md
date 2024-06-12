@@ -215,6 +215,7 @@ static void main(){
   - use blocking standard java http client (in java21 virtual threads will help)
   - ignore #fragments from urls
 - 2024-06-12
+- - write `<project>/.crawl-config.yml`
   - accepts hostnames from urls
     - hostname with removal of www. if exists for both http and https
   - show url and local file

@@ -47,7 +47,7 @@ class JCrawlerTest {
   JCrawler crawler = JCrawler
     .crawler()
     .withUrl("https://legislatie.just.ro/Public/DetaliiDocument/1")
-    .withCache(Locations.dir("d:\\home\\raiser\\work\\_var_namek_jcrawl\\scan4-just").mkdirIfNeeded())
+    .withProjectDir(Locations.dir("d:\\home\\raiser\\work\\_var_namek_jcrawl\\scan4-just").mkdirIfNeeded())
     .withFiltersByPrefix(
       "https://legislatie.just.ro/Public/DetaliiDocumentAfis/",
       //"https://legislatie.just.ro/Public/DetaliiDocument/1",

@@ -183,7 +183,7 @@
     <dependency>
       <groupId>org.raisercostin</groupId>
       <artifactId>jedio</artifactId>
-      <version>0.99</version>
+      <version>0.100</version>
     </dependency>
     <dependency>
       <groupId>org.jsoup</groupId>
