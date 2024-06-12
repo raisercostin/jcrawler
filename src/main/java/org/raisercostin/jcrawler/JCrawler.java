@@ -1,5 +1,6 @@
 package org.raisercostin.jcrawler;
 
+import java.io.InputStream;
 import java.net.SocketException;
 import java.time.Duration;
 import java.time.Instant;
@@ -7,6 +8,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
@@ -21,6 +23,10 @@ import ch.qos.logback.classic.filter.ThresholdFilter;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.Appender;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.PropertyNamingStrategies;
+import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import com.google.common.base.Throwables;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -61,10 +67,10 @@ import org.raisercostin.nodes.JacksonNodes;
 import org.raisercostin.nodes.Nodes;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
-import picocli.AutoComplete.GenerateCompletion;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.IExecutionExceptionHandler;
+import picocli.CommandLine.IVersionProvider;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Spec;
 import reactor.netty.http.HttpProtocol;
@@ -75,11 +81,12 @@ import reactor.netty.http.HttpProtocol;
 @Command(name = "jcrawl", mixinStandardHelpOptions = true, version = "jcrawl 0.1",
     description = "Crawler tool.",
     //subcommands = GenerateCompletion.class,
-    usageHelpAutoWidth = true, usageHelpWidth = 120, showDefaultValues = true)
+    usageHelpAutoWidth = true, usageHelpWidth = 120, showDefaultValues = true,
+    versionProvider = JCrawler.MyVersionProvider.class)
 @Slf4j
 public class JCrawler implements Callable<Integer> {
   public static void main(String[] args) {
-    //mainOne("", true);
+    mainOne("--version", true);
     //mainOne("--debug", true);
     //mainOne("https://raisercostin.org --traversal=BREADTH_FIRST", true);
     main(args, true);
@@ -93,6 +100,99 @@ public class JCrawler implements Callable<Integer> {
     StringTokenizer tokenizer = new StringTokenizer(cmdWithSpaces, ' ', '"');
     tokenizer.setIgnoreEmptyTokens(true);
     return tokenizer.getTokenArray();
+  }
+
+  //  git.branch=master
+  //      git.build.host=DESKTOP-HO5N784
+  //      git.build.time=2024-06-12T20\:53\:44+0300
+  //      git.build.user.email=raisercostin@gmail.com
+  //      git.build.user.name=raisercostin
+  //      git.build.version=0.3-SNAPSHOT
+  //      git.closest.tag.commit.count=6
+  //      git.closest.tag.name=jcrawler-0.2
+  //      git.commit.id=3454d8ad006219cdd9a49f930a31975fab87b334
+  //      git.commit.id.abbrev=3454d8a
+  //      git.commit.id.describe=jcrawler-0.2-6-g3454d8a
+  //      git.commit.id.describe-short=jcrawler-0.2-6
+  //      git.commit.message.full=upgraded
+  //      git.commit.message.short=upgraded
+  //      git.commit.time=2024-06-12T20\:49\:24+0300
+  //      git.commit.user.email=raisercostin@gmail.com
+  //      git.commit.user.name=raisercostin
+  //      git.dirty=false
+  //      git.local.branch.ahead=0
+  //      git.local.branch.behind=0
+  //      git.remote.origin.url=https\://github.com/raisercostin/jcrawler.git
+  //      git.tags=
+  //      git.total.commit.count=94
+  @JsonNaming(PropertyNamingStrategies.LowerDotCaseStrategy.class)
+  public static class GitInfo {
+    public String gitBranch;
+    public String gitBuildHost;
+    public String gitBuildTime;
+    public String gitBuildUserEmail;
+    public String gitBuildUserName;
+    public String gitBuildVersion;
+    public int gitClosestTagCommitCount;
+    public String gitClosestTagName;
+    public String gitCommitId;
+    public String gitCommitIdAbbrev;
+    public String gitCommitIdDescribe;
+    @JsonProperty("git.commit.id.describe-short")
+    public String gitCommitIdDescribeShort;
+    public String gitCommitMessageFull;
+    public String gitCommitMessageShort;
+    public String gitCommitTime;
+    public String gitCommitUserEmail;
+    public String gitCommitUserName;
+    public boolean gitDirty;
+    public int gitLocalBranchAhead;
+    public int gitLocalBranchBehind;
+    public String gitRemoteOriginUrl;
+    public String gitTags;
+    public int gitTotalCommitCount;
+    //
+    //    @JsonAnyGetter
+    //    private Map<String, Object> otherProperties = new HashMap<>();
+    //
+    //    @JsonAnySetter
+    //    public void setOtherProperty(String name, Object value) {
+    //      otherProperties.put(name, value);
+    //    }
+  }
+
+  static class MyVersionProvider implements IVersionProvider {
+    public static Properties loadProperties(String filePath) throws Exception {
+      Properties properties = new Properties();
+      try (InputStream input = MyVersionProvider.class.getClassLoader().getResourceAsStream(filePath)) {
+        if (input == null) {
+          throw new RuntimeException("Unable to find " + filePath);
+        }
+        properties.load(input);
+      }
+      return properties;
+    }
+
+    @Override
+    public String[] getVersion() throws Exception {
+      Properties properties = loadProperties("git.properties");
+      ObjectMapper mapper = new ObjectMapper();
+      GitInfo git = mapper.convertValue(properties, GitInfo.class);
+      //      GitInfo git = Nodes.hocon.toObject(
+      //        Locations.classpath("git.properties").readContent(),
+      //        GitInfo.class);
+      // Return the version dynamically
+      String version = """
+          %s
+          Build Time: %s
+          Build User: %s (%s)""".formatted(
+        git.gitCommitIdDescribe,
+        git.gitBuildTime,
+        git.gitBuildUserName,
+        git.gitBuildUserEmail);
+
+      return new String[] { version };
+    }
   }
 
   private static void main(String[] args, boolean exitAtEnd) {
