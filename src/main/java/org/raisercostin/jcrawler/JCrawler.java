@@ -286,7 +286,7 @@ public class JCrawler implements Callable<Integer> {
     verbosity.configureLogbackAppender("STDERR");
     //CommandLine.Help help = new CommandLine.Help(spec);
     //System.out.println(help.optionList());
-    crawl().forEach(x -> System.out.println(x.externalForm + " -> " + x.localCache));
+    crawl().forEach(x -> System.out.println(x.externalForm + " => " + x.localCache));
     return 0;
   }
 
@@ -306,7 +306,7 @@ public class JCrawler implements Callable<Integer> {
   }
 
   public FileLocation cachedFile(String url) {
-    return (FileLocation) cache.child(SlugEscape.toSlug(url));
+    return (FileLocation) cache.child(SlugEscape.toSlug(url).slug);
   }
 
   public FileLocation slug(HyperLink href) {
@@ -326,7 +326,7 @@ public class JCrawler implements Callable<Integer> {
   }
 
   public ReferenceLocation cached(HyperLink href) {
-    return cache.child(href.slug());
+    return cache.child(href.slug().slug);
   }
 
   public JCrawler withUrl(String... urls) {
@@ -415,6 +415,7 @@ public class JCrawler implements Callable<Integer> {
               String body = content.getBody();
               dest.write(body);
               Metadata metadata = content.getMetadata();
+              metadata.addField("crawler.slug", href.slug());
               metaJson.asPathLocation().write(content.computeMetadata(metadata));
               links = extractLinksInMemory(body, dest, metadata);
             } catch (Exception e) {
@@ -494,7 +495,7 @@ public class JCrawler implements Callable<Integer> {
           return newIterator;
         } catch (com.fasterxml.jackson.databind.RuntimeJsonMappingException e) {
           log.info(
-            "Ignoring links cache from {} and read links again for a parsing error. Enable trace for full details.",
+            "Ignoring links cache from {} and read links again for a parsing error. Enable trace for full details:{}",
             metaLinks, e.getMessage());
           log.trace("Ignoring links cache from {} and read links again for a parsing error.", metaLinks, e);
         }

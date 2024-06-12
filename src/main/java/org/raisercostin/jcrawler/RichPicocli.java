@@ -10,7 +10,7 @@ public class RichPicocli {
   public static class LocationConverter implements CommandLine.ITypeConverter<Location> {
     @Override
     public Location convert(String value) throws Exception {
-      return Locations.location(value);
+      return Locations.path(value);
     }
   }
 

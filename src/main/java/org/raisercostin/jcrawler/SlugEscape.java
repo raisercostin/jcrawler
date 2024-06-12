@@ -6,8 +6,11 @@ import java.util.regex.Pattern;
 import com.google.common.base.Charsets;
 import com.google.common.hash.Hashing;
 import io.vavr.control.Try;
+import lombok.AllArgsConstructor;
+import lombok.ToString;
 import lombok.val;
 import org.apache.commons.lang3.StringUtils;
+import org.checkerframework.checker.nullness.qual.NonNull;
 
 /**
  Responsibility to create filenames from urls.
@@ -37,15 +40,25 @@ public class SlugEscape {
   private static final Pattern nonUrlChars = Pattern.compile("[()\\[\\]{}_'\"`%^+_*!×&ƒ\\:? -]");//.r.unanchored
   private static final Pattern nonUrlPathChars = Pattern.compile("[\\/\\.]");
 
-  public static String toSlug(String text) {
+  @AllArgsConstructor
+  @ToString
+  public static class Slug {
+    private Slug() {
+    }
+
+    public String code;
+    public String slug;
+  }
+
+  public static @NonNull Slug toSlug(String text) {
     //decode if url
-    String result = Try.of(() -> java.net.URLDecoder.decode(text, "UTF-8")).getOrElse("");
+    String result = Try.of(() -> java.net.URLDecoder.decode(text, "UTF-8")).get();
     //convert to latin
-    result = Normalizer.normalize(result, Normalizer.Form.NFD).replaceAll("\\p{InCombiningDiacriticalMarks}+", "");
     result = result.toLowerCase();
-    String code = Hashing.sha256().newHasher().putString(result, Charsets.UTF_8).hash().toString();
-    String shortCode = "-#" + code.substring(0, 9) + "-";
-    code = "--sha256-" + code;
+    String codeFull = Hashing.sha256().newHasher().putString(result, Charsets.UTF_8).hash().toString();
+    String shortCode = "-#" + codeFull.substring(0, 9) + "-";
+    String code = "--sha256-" + codeFull;
+    result = Normalizer.normalize(result, Normalizer.Form.NFD).replaceAll("\\p{InCombiningDiacriticalMarks}+", "");
     //int extensionPos = result.lastIndexOf(".");
     String extension = "";//StringUtils.substring(result, extensionPos==-1?-1:extensionPos+1);
     //result = StringUtils.substring(result, 0, extensionPos==-1?);
@@ -83,12 +96,12 @@ public class SlugEscape {
      * //result = result.replaceAll(exceptLast,"-")
      * //println(s"toSlug($text)=[$result]")
      */
-    return StringUtils.substring(result, 0, SPLIT_AT)
+    return new Slug(codeFull, StringUtils.substring(result, 0, SPLIT_AT)
         + shortCode +
         StringUtils.abbreviate(StringUtils.substring(result, SPLIT_AT),
           MAX_FS_FILENAME_REACHED_SUFFIX,
           MAX_FS_FILENAME_LENGTH - shortCode.length() - code.length() - extension.length() - SPLIT_AT)
         + code
-        + extension;
+        + extension);
   }
 }

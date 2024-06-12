@@ -9,6 +9,7 @@ import lombok.ToString;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.raisercostin.jcrawler.SlugEscape.Slug;
 import org.raisercostin.jedio.FileLocation;
 import org.raisercostin.jedio.RelativeLocation;
 import org.raisercostin.jedio.url.SimpleUrl;
@@ -32,13 +33,13 @@ public class HyperLink {
       sourceLocalCache);
   }
 
-  private static String toLocalCache(String url) {
+  private static Slug toLocalCache(String url) {
     return SlugEscape.toSlug(url);
   }
 
   @EqualsAndHashCode.Include
   String externalForm;
-  String localCache;
+  Slug localCache;
   String relativeOrAbsoluteHyperlink;
   @ToString.Exclude
   String text;
@@ -66,7 +67,7 @@ public class HyperLink {
     return SimpleUrl.from(externalForm).uri.getHost();
   }
 
-  public String slug() {
+  public Slug slug() {
     return toLocalCache(externalForm);
   }
 
