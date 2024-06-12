@@ -267,3 +267,8 @@ static void main(){
     npm run release-prepare
     npm run release-perform-local -- --releaseVersion 0.86
     ```
+- To release for scoop
+  - ```cli
+    powershell -Command "d:\home\raiser-apps\apps\scoop\current\bin\checkver jcrawler . -u"
+    git commit -am "Release for indepdendent scoop"
+    ```
