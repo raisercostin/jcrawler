@@ -1,14 +1,14 @@
 {
-  "version": "0.2",
+  "version": "0.3",
   "description": "Crawler tool and java fluent library.",
   "homepage": "https://github.com/raisercostin/jcrawl",
   "license": "MIT License",
   "suggest": {
     "Java Runtime Environment": "java/termurin17-jre"
   },
-  "url": "https://github.com/raisercostin/maven-repo/raw/master/org/raisercostin/jcrawler/0.2/jcrawler-0.2-main.jar",
-  "hash": "ef42d1f00cbd51fa8ad605246c1131892be3de318f4fe33c0102472304c65689",
-  "pre_install": "Set-Content -Path \"$dir\\jcrawler.cmd\" -Value \"@java -jar %~dp0jcrawler-0.2-main.jar %*\" -Encoding ASCII",
+  "url": "https://github.com/raisercostin/maven-repo/raw/master/org/raisercostin/jcrawler/0.3/jcrawler-0.3-main.jar",
+  "hash": "7a43dffdc25ea069c40828c184ed68d800cc597f3c78558431fc21f7e8ba3d4e",
+  "pre_install": "Set-Content -Path \"$dir\\jcrawler.cmd\" -Value \"@java -jar %~dp0jcrawler-0.3-main.jar %*\" -Encoding ASCII",
   "bin": "jcrawler.cmd",
   "checkver": {
     "url": "https://github.com/raisercostin/maven-repo/raw/master/org/raisercostin/jcrawler/maven-metadata-local.xml",
