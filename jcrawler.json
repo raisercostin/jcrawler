@@ -15,6 +15,7 @@
     "re": "release>(\\d(?:\\.\\d+))</release"
   },
   "autoupdate": {
-    "url": "https://github.com/raisercostin/maven-repo/raw/master/org/raisercostin/jcrawler/$version/jcrawler-$version-main.jar"
+    "url": "https://github.com/raisercostin/maven-repo/raw/master/org/raisercostin/jcrawler/$version/jcrawler-$version-main.jar",
+    "pre_install": "Set-Content -Path \"$dir\\jcrawler.cmd\" -Value \"@java -jar %~dp0jcrawler-$version-main.jar %*\" -Encoding ASCII"
   }
 }
