@@ -46,7 +46,7 @@ class JCrawlerTest {
 
   JCrawler crawler = JCrawler
     .crawler()
-    .start("https://legislatie.just.ro/Public/DetaliiDocument/1")
+    .withUrl("https://legislatie.just.ro/Public/DetaliiDocument/1")
     .withCache(Locations.dir("d:\\home\\raiser\\work\\_var_namek_jcrawl\\scan4-just").mkdirIfNeeded())
     .withFiltersByPrefix(
       "https://legislatie.just.ro/Public/DetaliiDocumentAfis/",
@@ -78,7 +78,7 @@ class JCrawlerTest {
       //.withCacheExpiryDuration(Duration.ofSeconds(1))
       .withTraversalType(TraversalType.PARALLEL_BREADTH_FIRST)
       //.withGenerator("https://legislatie.just.ro/Public/{DetaliiDocument|DetaliiDocumentAfis}/{1-3}")
-      .withGenerator("https://legislatie.just.ro/Public/DetaliiDocumentAfis/{1000-1010}")
+      .withUrl("https://legislatie.just.ro/Public/DetaliiDocumentAfis/{1000-1010}")
       .crawl()
       .map(x -> x.externalForm);
 
@@ -125,7 +125,7 @@ class JCrawlerTest {
   @Test
   void raisercostinOrg() {
     JCrawler.mainOne("", false);
-    JCrawler crawler = JCrawler.crawler().start("http://raisercostin.org");
+    JCrawler crawler = JCrawler.crawler().withUrl("http://raisercostin.org");
     assertThat(crawler.crawl().take(6).mkString("\n")).isEqualTo("""
         http://raisercostin.org
         https://raisercostin.org/

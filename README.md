@@ -209,13 +209,16 @@ static void main(){
 
 ## History
 
-- 2024-06-12
-  - log cache local file on download
+- [ ] next
   - extension from content type if not exists in url
     - cache hit will be detected by hash that doesn't consider extension?
-  - no logs if not enabled by command line
   - use blocking standard java http client (in java21 virtual threads will help)
   - ignore #fragments from urls
+- 2024-06-12
+  - accepts hostnames from urls
+    - hostname with removal of www. if exists for both http and https
+  - show url and local file
+  - log controlled by verbosity and to stderr (normally just WARN and ERORR)
 - 2024-06-11
   - cache for servers with errors
 - [x] 2024-06-10

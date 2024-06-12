@@ -69,4 +69,8 @@ public class HyperLink {
   public String slug() {
     return toLocalCache(externalForm);
   }
+
+  public String hostnameForAccept() {
+    return StringUtils.removeStart(hostname(), "wwww.");
+  }
 }

@@ -203,8 +203,8 @@ public class AnreSpotTest {
     JCrawler crawler = JCrawler
       .crawler()
       .withCache(workdir);
-    crawler
-      .start(judete)
+    String[] urls = { judete };
+    crawler.withUrl(urls)
       .crawl()
       .forEach(x -> System.out.println("aici" + x));
 
@@ -226,7 +226,7 @@ public class AnreSpotTest {
       .map(x -> x._2.head().idZona)
       .map(zone -> {
         String offer = crawler
-          .withGenerator(url1 + "&id_zona={" + zone + "}")
+          .withUrl(url1 + "&id_zona={" + zone + "}")
           .crawl()
           .map(x -> x.externalForm)
           .map(tap(x -> System.out.println("oferte " + x)))

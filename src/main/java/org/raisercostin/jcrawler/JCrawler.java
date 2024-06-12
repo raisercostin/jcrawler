@@ -3,6 +3,7 @@ package org.raisercostin.jcrawler;
 import java.net.SocketException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -22,25 +23,30 @@ import ch.qos.logback.core.Appender;
 import com.google.common.base.Throwables;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import com.google.common.collect.Sets;
 import com.google.common.graph.SuccessorsFunction;
 import com.google.common.graph.Traverser;
 import io.vavr.API;
+import io.vavr.collection.Array;
 import io.vavr.collection.List;
 import io.vavr.collection.Seq;
 import io.vavr.collection.Set;
 import io.vavr.collection.Traversable;
 import io.vavr.control.Option;
+import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.ToString;
 import lombok.With;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.text.StringTokenizer;
 import org.checkerframework.checker.nullness.qual.NonNull;
 import org.jedio.struct.RichIterable;
+import org.raisercostin.jcrawler.RichPicocli.LocationConverter;
+import org.raisercostin.jcrawler.RichPicocli.VavrConverter;
 import org.raisercostin.jedio.DirLocation;
 import org.raisercostin.jedio.FileLocation;
-import org.raisercostin.jedio.Location;
 import org.raisercostin.jedio.Locations;
 import org.raisercostin.jedio.ReadableFileLocation;
 import org.raisercostin.jedio.ReferenceLocation;
@@ -90,14 +96,15 @@ public class JCrawler implements Callable<Integer> {
   private static void main(String[] args, boolean exitAtEnd) {
     IExecutionExceptionHandler errorHandler = (ex, cmd, parseResult) -> {
       JCrawler config = cmd.getCommand();
-      if (config.debug) {
-        ex.printStackTrace(cmd.getErr()); // Print stack trace to the error stream
-      } else {
-        cmd.getErr()
-          .println(
-            cmd.getColorScheme()
-              .errorText(ex.getMessage() + ". Use --debug to see stacktrace."));
-      }
+      log.error("Cmd error.", ex);
+      //      if (config.debug) {
+      //        ex.printStackTrace(cmd.getErr()); // Print stack trace to the error stream
+      //      } else {
+      //        cmd.getErr()
+      //          .println(
+      //            cmd.getColorScheme()
+      //              .errorText(ex.getMessage() + ". Use --debug to see stacktrace."));
+      //      }
       cmd.getErr().println(cmd.getColorScheme().errorText("Use --help or -h for usage."));
       return cmd.getExitCodeExceptionMapper() != null
           ? cmd.getExitCodeExceptionMapper().getExitCode(ex)
@@ -119,13 +126,19 @@ public class JCrawler implements Callable<Integer> {
 
   public static JCrawler of(WebLocation webLocation, DirLocation cache,
       Option<ReadableFileLocation> whitelistSample) {
-    Option<Set<String>> whitelist = whitelistSample
+    Set<String> whitelist2 = whitelistSample
       .map(x -> extractLinksFromContent(x.readContent(), null, null)
         .map(z -> z.withoutQuery())
-        .toSet());
-    Seq<String> start = webLocation.ls().map(x -> x.asHttpClientLocation().toExternalForm()).toList();
-    return new JCrawler(null, TraversalType.BREADTH_FIRST, Nodes.json, start, cache, webLocation, start.toSet(),
-      whitelist, -1, 3, null, Duration.ofDays(100), null, Verbosity.INFO, false);
+        .toSet())
+      .getOrNull();
+    Seq<String> urls = webLocation.ls().map(x -> x.asHttpClientLocation().toExternalForm()).toList();
+    return of(cache, urls).withAdditionalAccepts(whitelist2);
+  }
+
+  private static JCrawler of(DirLocation cache, Seq<String> urls) {
+    JCrawler crawler = new JCrawler(null, TraversalType.BREADTH_FIRST, Nodes.json, cache, -1, 3, null,
+      Duration.ofDays(100), null, null, Verbosity.INFO, false, null).withUrlsAndAccept(urls);
+    return crawler;
   }
 
   private static Pattern exp(String sep) {
@@ -224,24 +237,11 @@ public class JCrawler implements Callable<Integer> {
   @picocli.CommandLine.Option(names = { "-t", "--traversal" },
       description = "Set the traversal mode: ${COMPLETION-CANDIDATES}.",
       showDefaultValue = Visibility.ALWAYS)
-  /**Breadth first is usual.*/
   public TraversalType traversalType = TraversalType.PARALLEL_BREADTH_FIRST;
   public JacksonNodes linksNodes = Nodes.json;
-  public Seq<String> start;
-
-  public static class LocationConverter implements CommandLine.ITypeConverter<Location> {
-    @Override
-    public Location convert(String value) throws Exception {
-      return Locations.location(value);
-    }
-  }
-
   @picocli.CommandLine.Option(names = { "-o", "--outdir" }, description = "Dir to write crawled content",
       converter = LocationConverter.class)
   public DirLocation cache = Locations.current().child(".crawl");
-  public WebLocation webLocation;
-  public Set<String> children;
-  public Option<Set<String>> exactMatch;
   @picocli.CommandLine.Option(names = { "-d", "--maxDocs" })
   public int maxDocs = Integer.MAX_VALUE;
   @picocli.CommandLine.Option(names = { "-c", "--maxConnections" })
@@ -266,14 +266,17 @@ public class JCrawler implements Callable<Integer> {
           - https://namekis.com/docA/3
           - https://namekis.com/doc2/1
           - https://namekis.com/doc2/2
-          - https://namekis.com/doc2/3""")
-  public String generator;
+          - https://namekis.com/doc2/3""", converter = VavrConverter.class)
+  @With(value = AccessLevel.PRIVATE)
+  public Seq<String> urls;
+  public Set<String> accept;
   @picocli.CommandLine.Option(names = { "-v", "--verbosity" },
       description = "Set the verbosity level: ${COMPLETION-CANDIDATES}.",
       showDefaultValue = Visibility.ALWAYS)
   public Verbosity verbosity = Verbosity.WARN;
   @picocli.CommandLine.Option(names = { "--debug" }, description = "Show stack trace")
   public boolean debug = false;
+  public String acceptHostname = "{http|https}://{www.|}%s";
 
   private JCrawler() {
   }
@@ -281,24 +284,25 @@ public class JCrawler implements Callable<Integer> {
   @Override
   public Integer call() throws Exception {
     verbosity.configureLogbackAppender("STDERR");
-    CommandLine.Help help = new CommandLine.Help(spec);
+    //CommandLine.Help help = new CommandLine.Help(spec);
     //System.out.println(help.optionList());
     crawl().forEach(x -> System.out.println(x.externalForm + " -> " + x.localCache));
     return 0;
   }
 
   public RichIterable<HyperLink> crawl() {
-    return crawl(this);
+    CrawlerWorker worker = new CrawlerWorker(this);
+    return worker.crawl(
+      urls.flatMap(generator -> Generators.parse(generator).generate()).map(x -> HyperLink.of(x)));
   }
 
-  /**Crawls eagerly config.maxDocs.*/
-  public static RichIterable<HyperLink> crawl(JCrawler config) {
-    CrawlerWorker worker = new CrawlerWorker(config);
-    if (config.generator != null) {
-      return worker
-        .crawl(Generators.parse(config.generator).generate().map(x -> HyperLink.of(x)));
-    }
-    return worker.crawl(config.start.map(x -> HyperLink.of(x)));
+  public static RichIterable<HyperLink> crawl(WebLocation webLocation, Option<ReadableFileLocation> whitelistSample,
+      DirLocation cache) {
+    whitelistSample = whitelistSample.filter(x -> x.exists());
+    JCrawler config = JCrawler.of(webLocation, cache, whitelistSample);
+    log.info("crawling [{}] to {}", webLocation, cache);
+    config.urls.forEach(System.out::println);
+    return config.crawl();
   }
 
   public FileLocation cachedFile(String url) {
@@ -309,19 +313,8 @@ public class JCrawler implements Callable<Integer> {
     return cachedFile(href.externalForm);
   }
 
-  public boolean accept(HyperLink link) {
-    if (exactMatch == null || exactMatch.isEmpty() || exactMatch.get().isEmpty()) {
-      return acceptStarts(link.externalForm);
-    }
-    return exactMatch.get().contains(link.externalForm) || acceptStarts(link.externalForm);
-  }
-
-  public boolean acceptStarts(String url) {
-    return children == null || children.exists(x -> url.startsWith(x));
-  }
-
   public JCrawler withFiltersByPrefix(String... filters) {
-    return withChildren(API.Set(filters));
+    return withAccept(API.Set(filters));
   }
 
   public JCrawler withProtocol(HttpProtocol... protocols) {
@@ -332,19 +325,20 @@ public class JCrawler implements Callable<Integer> {
     return dest.modifiedDateTime().toInstant().isBefore(Instant.now().minus(cacheExpiryDuration));
   }
 
-  public JCrawler start(String... urls) {
-    return withStart(API.Seq(urls));
+  public ReferenceLocation cached(HyperLink href) {
+    return cache.child(href.slug());
   }
 
-  public static void crawl(WebLocation webLocation, Option<ReadableFileLocation> whitelistSample,
-      DirLocation cache) {
-    whitelistSample = whitelistSample.filter(x -> x.exists());
-    JCrawler config = JCrawler.of(webLocation, cache, whitelistSample);
-    log.info("crawling [{}] to {}", webLocation, cache);
-    Seq<String> files = config.start;
-    files.forEach(System.out::println);
-    CrawlerWorker crawler = new CrawlerWorker(config);
-    crawler.crawl(files.map(url -> HyperLink.of(url)));
+  public JCrawler withUrl(String... urls) {
+    return withUrlsAndAccept(Array.of(urls));
+  }
+
+  public JCrawler withUrlsAndAccept(Seq<String> urls) {
+    return withUrls(urls);
+  }
+
+  private JCrawler withAdditionalAccepts(Set<String> additionalAccept) {
+    return withAccept(this.accept.addAll(additionalAccept));
   }
 
   public static class CrawlerWorker {
@@ -355,9 +349,16 @@ public class JCrawler implements Callable<Integer> {
     public final Cache<String, String> failingServers = CacheBuilder.newBuilder()
       .expireAfterWrite(10, TimeUnit.MINUTES)
       .build();
+    private Set<String> accept;
 
     public CrawlerWorker(JCrawler config) {
       this.config = config;
+      this.accept = config.urls.iterator()
+        .map(
+          x -> config.acceptHostname.formatted(HyperLink.of(x).hostnameForAccept()))
+        .toSet()
+        .addAll(config.accept != null ? config.accept : Collections.emptySet())
+        .flatMap(x -> Generators.generate(x));
       this.client = new WebClientFactory("jcrawler", config.protocols);
       //this.semaphore = new Semaphore(config.maxConnections);
       this.tokenQueue = new ArrayBlockingQueue<>(config.maxConnections);
@@ -366,6 +367,7 @@ public class JCrawler implements Callable<Integer> {
       for (int i = 0; i < config.maxConnections; i++) {
         tokenQueue.add("c" + i);
       }
+      log.info("Accepts:\n - {}", accept.mkString("\n - "));
     }
 
     private RichIterable<HyperLink> crawl(Traversable<HyperLink> todo) {
@@ -374,9 +376,16 @@ public class JCrawler implements Callable<Integer> {
         .take(config.maxDocs);
     }
 
+    private boolean accept(HyperLink link) {
+      if (accept == null) {
+        return false;
+      }
+      return accept.exists(x -> link.externalForm.startsWith(x));
+    }
+
     @SneakyThrows
     private Traversable<HyperLink> downloadAndExtractLinks(HyperLink href) {
-      if (!config.accept(href)) {
+      if (!accept(href)) {
         log.debug("ignored [{}]", href.externalForm);
         return API.Seq();
       }
@@ -436,7 +445,7 @@ public class JCrawler implements Callable<Integer> {
         return links
           //Filter out self reference when traversing
           .filter(x -> !x.externalForm.equals(href.externalForm))
-          .filter(config::accept)
+          .filter(this::accept)
           //return distinct externalForm - first
           .iterator()
           .groupBy(x -> x.externalForm)
@@ -517,9 +526,5 @@ public class JCrawler implements Callable<Integer> {
       metaLinks.asWritableFile().write(c);
       return all;
     }
-  }
-
-  public ReferenceLocation cached(HyperLink href) {
-    return cache.child(href.slug());
   }
 }

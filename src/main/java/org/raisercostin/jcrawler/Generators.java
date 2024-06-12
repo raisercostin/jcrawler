@@ -2,12 +2,15 @@ package org.raisercostin.jcrawler;
 
 import java.util.regex.Matcher;
 
+import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
 import io.vavr.API;
 import io.vavr.Tuple3;
+import io.vavr.collection.Iterator;
 import io.vavr.collection.List;
 import io.vavr.collection.Seq;
 import io.vavr.control.Either;
+import lombok.AllArgsConstructor;
 import lombok.ToString;
 import org.jedio.regex.RichRegex;
 import org.jedio.struct.RichIterable;
@@ -68,24 +71,26 @@ public class Generators {
       //it's a range
       return new RangeGenerator(Integer.parseInt(rangePart.get()._2), Integer.parseInt(rangePart.get()._3));
     }
-    OrGenerator orGenerator = new OrGenerator();
-    Either<String, Matcher> orParts = RichRegex.regexpMatcher("(?<before>[^|]*)\\|?", internal, 1);
-    if (orParts.isRight()) {
-      for (;;) {
-        Matcher matcher = orParts.get();
-        String value = matcher.group("before");
-        if (value.isEmpty()) {
-          break;
-        }
-        orGenerator.add(new ConstGenerator(value));
-        if (matcher.find()) {
-        } else {
-          break;
-        }
-      }
-      return orGenerator;
-    }
-    return new ConstGenerator(internal);
+    OrGenerator orGenerator = new OrGenerator(
+      Iterator.ofAll(Splitter.on('|').split(internal)).map(x -> (Generator) new ConstGenerator(x)).toList());
+    //    Either<String, Matcher> orParts = RichRegex.regexpMatcher("(?<before>[^|]*)\\|?", internal, 1);
+    //    if (orParts.isRight()) {
+    //      for (;;) {
+    //        Matcher matcher = orParts.get();
+    //        String value = matcher.group("before");
+    //        if (value.isEmpty()) {
+    //          break;
+    //        }
+    //        orGenerator.add(new ConstGenerator(value));
+    //        if (matcher.find()) {
+    //        } else {
+    //          break;
+    //        }
+    //      }
+    //      return orGenerator;
+    //    }
+    //    return new ConstGenerator(internal);
+    return orGenerator;
   }
 
   public interface Generator {
@@ -123,6 +128,7 @@ public class Generators {
   }
 
   @ToString
+  @AllArgsConstructor
   public static class OrGenerator implements Generator {
     Seq<Generator> all = API.Seq();
 

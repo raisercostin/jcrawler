@@ -49,4 +49,9 @@ class GeneratorsTest {
             https://legislatie.just.ro/Public/DetaliiDocumentAfis/2
             https://legislatie.just.ro/Public/DetaliiDocumentAfis/3""");
   }
+
+  @Test
+  void testOptional() {
+    assertThat(Generators.generate("foo{bar|}zar").mkString(",")).isEqualTo("foobarzar,foozar");
+  }
 }
