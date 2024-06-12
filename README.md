@@ -205,16 +205,19 @@ static void main(){
     - [x] http meta
     - [x] hyperlinks meta file
     - [x] add pluggable config of meta
+- [ ] Versioned slug. When changing encoding old crawlers cache result will not work. Best to keep all slug strategies and use one by one by priority.
 
 ## History
 
-- [ ] 2024-06-11
+- 2024-06-12
+  - log cache local file on download
   - extension from content type if not exists in url
     - cache hit will be detected by hash that doesn't consider extension?
-  - cache for servers with errors
   - no logs if not enabled by command line
   - use blocking standard java http client (in java21 virtual threads will help)
   - ignore #fragments from urls
+- 2024-06-11
+  - cache for servers with errors
 - [x] 2024-06-10
   - open source on github.com
   - fat jar release

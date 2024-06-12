@@ -9,6 +9,8 @@ import lombok.ToString;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.raisercostin.jedio.FileLocation;
+import org.raisercostin.jedio.RelativeLocation;
 import org.raisercostin.jedio.url.SimpleUrl;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE, force = true)
@@ -18,20 +20,25 @@ import org.raisercostin.jedio.url.SimpleUrl;
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class HyperLink {
   public static HyperLink of(String url) {
-    return new HyperLink(url, "original", "", null, null, null, null);
+    return new HyperLink(url, toLocalCache(url), "original", "", null, null, null, null);
   }
 
-  public static HyperLink of(String relativeOrAbsoluteHyperlink, String text, String anchor, String all,
-      String sourceHyperlink,
-      String localCache) {
+  public static HyperLink of(String relativeOrAbsoluteHyperlink, String text,
+      String anchor, String all, String sourceHyperlink, String sourceLocalCache) {
     String url = SimpleUrl.resolve(sourceHyperlink, relativeOrAbsoluteHyperlink);
     //WebClientLocation link = Locations.url(sourceHyperlink, relativeOrAbsoluteHyperlink);
     //TODO link should not contain #fragments since link is used for uniqueness
-    return new HyperLink(url, relativeOrAbsoluteHyperlink, text, anchor, all, sourceHyperlink, localCache);
+    return new HyperLink(url, toLocalCache(url), relativeOrAbsoluteHyperlink, text, anchor, all, sourceHyperlink,
+      sourceLocalCache);
+  }
+
+  private static String toLocalCache(String url) {
+    return SlugEscape.toSlug(url);
   }
 
   @EqualsAndHashCode.Include
   String externalForm;
+  String localCache;
   String relativeOrAbsoluteHyperlink;
   @ToString.Exclude
   String text;
@@ -39,7 +46,7 @@ public class HyperLink {
   @ToString.Exclude
   String all;
   String sourceHyperlink;
-  String localCache;
+  String sourceLocalCache;
 
   @ToString.Include
   String text() {
@@ -57,5 +64,9 @@ public class HyperLink {
   @SneakyThrows
   public String hostname() {
     return SimpleUrl.from(externalForm).uri.getHost();
+  }
+
+  public String slug() {
+    return toLocalCache(externalForm);
   }
 }

@@ -3,6 +3,9 @@ package org.raisercostin.jcrawler;
 import java.net.SocketException;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
@@ -11,6 +14,11 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.LoggerContext;
+import ch.qos.logback.classic.filter.ThresholdFilter;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.Appender;
 import com.google.common.base.Throwables;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -29,7 +37,6 @@ import lombok.With;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.text.StringTokenizer;
 import org.checkerframework.checker.nullness.qual.NonNull;
-import org.jedio.RichThrowable;
 import org.jedio.struct.RichIterable;
 import org.raisercostin.jedio.DirLocation;
 import org.raisercostin.jedio.FileLocation;
@@ -38,12 +45,14 @@ import org.raisercostin.jedio.Locations;
 import org.raisercostin.jedio.ReadableFileLocation;
 import org.raisercostin.jedio.ReferenceLocation;
 import org.raisercostin.jedio.WritableFileLocation;
+import org.raisercostin.jedio.op.DeleteOptions;
 import org.raisercostin.jedio.url.WebClientLocation2.RequestResponse;
 import org.raisercostin.jedio.url.WebClientLocation2.RequestResponse.Metadata;
 import org.raisercostin.jedio.url.WebClientLocation2.WebClientFactory;
 import org.raisercostin.jedio.url.WebLocation;
 import org.raisercostin.nodes.JacksonNodes;
 import org.raisercostin.nodes.Nodes;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import picocli.AutoComplete.GenerateCompletion;
 import picocli.CommandLine;
@@ -63,6 +72,7 @@ import reactor.netty.http.HttpProtocol;
 @Slf4j
 public class JCrawler implements Callable<Integer> {
   public static void main(String[] args) {
+    //mainOne("--debug", true);
     //mainOne("https://raisercostin.org --traversal=BREADTH_FIRST", true);
     main(args, true);
   }
@@ -127,15 +137,15 @@ public class JCrawler implements Callable<Integer> {
 
   private final static Seq<Pattern> allExp = API.Seq(exp("'"), exp("\\\""));
 
-  private static io.vavr.collection.Iterator<HyperLink> extractLinksFromContent(final String content, String source,
+  private static io.vavr.collection.Iterator<HyperLink> extractLinksFromContent(final String content,
+      String source,
       String sourceUrl) {
     io.vavr.collection.Iterator<HyperLink> result;
     result = allExp.iterator().flatMap(exp -> {
       io.vavr.collection.Iterator<Matcher> all = io.vavr.collection.Iterator.continually(exp.matcher(content))
         .takeWhile(matcher -> matcher.find());
       return all.map(
-        m -> HyperLink.of(m.group(1).trim(), m.group(3).trim(), m.group(2), m.group().trim(), sourceUrl,
-          source));
+        m -> HyperLink.of(m.group(1).trim(), m.group(3).trim(), m.group(2), m.group().trim(), sourceUrl, source));
     });
     return result;
   }
@@ -182,6 +192,30 @@ public class JCrawler implements Callable<Integer> {
 
     Verbosity(Level logbackLevel) {
       this.logbackLevel = logbackLevel;
+    }
+
+    /**Configures logback appender (usually STDERR not to messup STDOUT to specified log level).*/
+    public void configureLogbackAppender(String appender) {
+      Map<String, Appender<ILoggingEvent>> appendersMap = getAppendersMap();
+      io.vavr.collection.Iterator.ofAll(appendersMap.get(appender).getCopyOfAttachedFiltersList())
+        .filter(x -> x instanceof ThresholdFilter)
+        .forEach(x -> ((ThresholdFilter) x).setLevel(logbackLevel.toString()));
+    }
+
+    private Map<String, Appender<ILoggingEvent>> getAppendersMap() {
+      LoggerContext loggerContext = (LoggerContext) LoggerFactory.getILoggerFactory();
+
+      Map<String, Appender<ILoggingEvent>> appendersMap = new HashMap<>();
+      for (Logger logger : loggerContext.getLoggerList()) {
+        Iterator<Appender<ILoggingEvent>> appenderIterator = logger.iteratorForAppenders();
+        while (appenderIterator.hasNext()) {
+          Appender<ILoggingEvent> appender = appenderIterator.next();
+          if (!appendersMap.containsKey(appender.getName())) {
+            appendersMap.put(appender.getName(), appender);
+          }
+        }
+      }
+      return appendersMap;
     }
   }
 
@@ -237,7 +271,7 @@ public class JCrawler implements Callable<Integer> {
   @picocli.CommandLine.Option(names = { "-v", "--verbosity" },
       description = "Set the verbosity level: ${COMPLETION-CANDIDATES}.",
       showDefaultValue = Visibility.ALWAYS)
-  public Verbosity verbosity = Verbosity.INFO;
+  public Verbosity verbosity = Verbosity.WARN;
   @picocli.CommandLine.Option(names = { "--debug" }, description = "Show stack trace")
   public boolean debug = false;
 
@@ -246,6 +280,7 @@ public class JCrawler implements Callable<Integer> {
 
   @Override
   public Integer call() throws Exception {
+    verbosity.configureLogbackAppender("STDERR");
     CommandLine.Help help = new CommandLine.Help(spec);
     //System.out.println(help.optionList());
     crawl().forEach(x -> System.out.println(x.externalForm + " -> " + x.localCache));
@@ -260,9 +295,18 @@ public class JCrawler implements Callable<Integer> {
   public static RichIterable<HyperLink> crawl(JCrawler config) {
     CrawlerWorker worker = new CrawlerWorker(config);
     if (config.generator != null) {
-      return worker.crawl(Generators.parse(config.generator).generate().map(x -> HyperLink.of(x)));
+      return worker
+        .crawl(Generators.parse(config.generator).generate().map(x -> HyperLink.of(x)));
     }
     return worker.crawl(config.start.map(x -> HyperLink.of(x)));
+  }
+
+  public FileLocation cachedFile(String url) {
+    return (FileLocation) cache.child(SlugEscape.toSlug(url));
+  }
+
+  public FileLocation slug(HyperLink href) {
+    return cachedFile(href.externalForm);
   }
 
   public boolean accept(HyperLink link) {
@@ -290,14 +334,6 @@ public class JCrawler implements Callable<Integer> {
 
   public JCrawler start(String... urls) {
     return withStart(API.Seq(urls));
-  }
-
-  public FileLocation slug(HyperLink href) {
-    return cachedFile(href.externalForm);
-  }
-
-  public FileLocation cachedFile(String url) {
-    return (FileLocation) cache.child(SlugEscape.toSlug(url));
   }
 
   public static void crawl(WebLocation webLocation, Option<ReadableFileLocation> whitelistSample,
@@ -349,7 +385,7 @@ public class JCrawler implements Callable<Integer> {
         log.debug("ignored failing server for a while [{}]", href.externalForm);
         return API.Seq();
       }
-      WritableFileLocation dest = config.slug(href).asWritableFile();
+      WritableFileLocation dest = config.cached(href).asWritableFile();
       try {
         Traversable<HyperLink> links = null;
         ReferenceLocation metaJson = dest.meta("", ".meta.json");
@@ -362,8 +398,8 @@ public class JCrawler implements Callable<Integer> {
           try {
             //check writing before downloading
             //dest.touch();
-            metaJson.asPathLocation().write("").deleteFile();
-            dest.write("").deleteFile();
+            metaJson.asPathLocation().write("").deleteFile(DeleteOptions.deletePermanent());
+            dest.write("").deleteFile(DeleteOptions.deletePermanent());
             log.debug("download from url #{} [{}]", token, href.externalForm);
             try {
               RequestResponse content = client.get(href.externalForm).readCompleteContentSync(null);
@@ -468,10 +504,10 @@ public class JCrawler implements Callable<Integer> {
       int status = meta.statusCodeValue;
       if (300 <= status && status < 400 && meta.responseHeaders.getLocation() != null) {
         //String sourceUrl = meta2.httpMetaRequestUri().get();
+        String url = meta.responseHeaders.getLocation().toString();
         all = all
           .append(
-            HyperLink.of(meta.responseHeaders.getLocation().toString(), "Moved - http status " + status, null, "",
-              sourceUrl, source.toExternalForm()));
+            HyperLink.of(url, "Moved - http status " + status, null, "", sourceUrl, source.toExternalForm()));
       }
       //      YAMLMapper mapper = Nodes.yml.mapper();
       //      mapper.configure(YAMLGenerator.Feature.LITERAL_BLOCK_STYLE, true);
@@ -481,5 +517,9 @@ public class JCrawler implements Callable<Integer> {
       metaLinks.asWritableFile().write(c);
       return all;
     }
+  }
+
+  public ReferenceLocation cached(HyperLink href) {
+    return cache.child(href.slug());
   }
 }
