@@ -11,8 +11,8 @@
   "pre_install": "Set-Content -Path \"$dir\\jcrawler.cmd\" -Value \"@java -jar %~dp0jcrawler-0.1-main.jar %*\" -Encoding ASCII",
   "bin": "jcrawler.cmd",
   "checkver": {
-    "url": "https://github.com/raisercostin/maven-repo/tree/master/org/raisercostin/jcrawler",
-    "re": "href=\\\"[^\"]*/(\\d+\\.\\d+\\.\\d+)/\\\""
+    "url": "https://github.com/raisercostin/maven-repo/raw/master/org/raisercostin/jcrawler/maven-metadata-local.xml",
+    "re": "release>(\\d(?:\\.\\d+))</release"
   },
   "autoupdate": {
     "url": "https://github.com/raisercostin/maven-repo/raw/master/org/raisercostin/jcrawler/$version/jcrawler-$version-main.jar"

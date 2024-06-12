@@ -38,6 +38,7 @@ function releasePerformLocal(args?: any): void {
       );
     },
   );
+  shell.cp(`${localMavenRepo}/${groupPath}/${artifactId}/maven-metadata-local.xml`, `${repo}/${groupPath}/${artifactId}/maven-metadata-local.xml`);
 
   //shell.rm("-rf", `${repo}/${groupPath}/${artifactId}/${version}/*main*`);
   shell.exec(`git -C ${repo} status`);
