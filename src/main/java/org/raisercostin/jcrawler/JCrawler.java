@@ -86,7 +86,7 @@ import reactor.netty.http.HttpProtocol;
 @Slf4j
 public class JCrawler implements Callable<Integer> {
   public static void main(String[] args) {
-    mainOne("--version", true);
+    //mainOne("--version", true);
     //mainOne("--debug", true);
     //mainOne("https://raisercostin.org --traversal=BREADTH_FIRST", true);
     main(args, true);
