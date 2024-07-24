@@ -2,6 +2,7 @@
   "name": "jcrawler",
   "scripts": {
     "normalize-pom": "ts-node scripts.ts normalizePom",
+    "release": "npm run release-prepare && npm run release-perform-local",
     "prerelease-prepare": "npm install",
     "release-prepare": "ts-node scripts.ts releasePrepare || echo 'If preparation failed is better to rollback' && npm run release-rollback",
     "release-rollback": "mvn release:rollback",
@@ -9,9 +10,16 @@
     "mvn-update-lib-versions": "mvn versions:update-properties && mvn versions:use-latest-versions",
     "reformat": "mvn validate -DskipTests",
     "reformat-prettier": "npx prettier --write .",
-    "dependency-check": "dependency-check:check"
+    "dependency-check": "dependency-check:check",
+    "release-scoop": "powershell -Command \"checkver jcrawler . -u\""
   },
   "devDependencies": {
+    "@prettier/plugin-xml": "2.2.0",
+    "prettier": "^2.7.1",
+    "prettier-plugin-java": "1.6.2",
+    "prettier-plugin-kotlin": "2.1.0",
+    "prettier-plugin-properties": "0.2.0",
+    "prettier-plugin-sh": "0.12.8",
     "@types/shelljs": "^0.8.14",
     "@types/yargs": "^17.0.29",
     "shelljs": "^0.8.5",
