@@ -205,7 +205,7 @@ public class AnreSpotTest {
       .withProjectPath(projectDir);
     String[] urls = { judete };
     crawler.withUrl(urls)
-      .crawl()
+      .crawlIterator()
       .forEach(x -> System.out.println("aici" + x));
 
     List<Judet> content = Nodes.json.toList(crawler.cachedFile(judete).readContent(), Judet.class);
@@ -227,7 +227,7 @@ public class AnreSpotTest {
       .map(zone -> {
         String offer = crawler
           .withUrl(url1 + "&id_zona={" + zone + "}")
-          .crawl()
+          .crawlIterator()
           .map(x -> x.externalForm)
           .map(tap(x -> System.out.println("oferte " + x)))
           .head();

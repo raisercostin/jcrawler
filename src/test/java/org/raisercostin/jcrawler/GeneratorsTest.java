@@ -54,4 +54,10 @@ class GeneratorsTest {
   void testOptional() {
     assertThat(Generators.generate("foo{bar|}zar").mkString(",")).isEqualTo("foobarzar,foozar");
   }
+
+  @Test
+  void testGenerate1() {
+    assertThat(Generators.generate("https://op.europa.eu/en/web/who-is-who/archive").mkString(","))
+      .isEqualTo("https://op.europa.eu/en/web/who-is-who/archive");
+  }
 }

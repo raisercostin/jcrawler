@@ -1,5 +1,7 @@
 package org.raisercostin.jcrawler;
 
+import java.util.function.Supplier;
+
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
@@ -9,9 +11,11 @@ import lombok.ToString;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
-import org.raisercostin.jcrawler.SlugEscape.Slug;
+import org.jedio.struct.RichIterable;
 import org.raisercostin.jedio.FileLocation;
 import org.raisercostin.jedio.RelativeLocation;
+import org.raisercostin.jedio.SlugEscape;
+import org.raisercostin.jedio.SlugEscape.Slug;
 import org.raisercostin.jedio.url.SimpleUrl;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE, force = true)
@@ -34,7 +38,7 @@ public class HyperLink {
   }
 
   private static Slug toLocalCache(String url) {
-    return SlugEscape.toSlug(url);
+    return SlugEscape.slugs(url).head();
   }
 
   @EqualsAndHashCode.Include

@@ -166,6 +166,13 @@ static void main(){
 }
 ```
 
+## Concepts
+- original url - the full url downloaded
+- url - Sanitized url without fragment and protocol suffix only if content is different: redirect meet for example on http or ftp is done after http/https or force on all protocols
+- file - A file with extension deduced from response header and/or content-disposition
+- meta - A file with identical with pair file but with extension appened .meta
+- cache - A symlink file to a meta that shows that a specific url was downloaded.
+
 ## Features
 
 - [x] crawler
@@ -210,13 +217,16 @@ static void main(){
 - [ ] Versioned slug. When changing encoding old crawlers cache result will not work. Best to keep all slug strategies and use one by one by priority.
 
 ## History
-
 - [ ] next
+  - [ ] crawl local files - for test is usefull
+  - [ ] on unknown protocols: warning or error. for example tel:
+  - [ ] Parallel bug - doesn't work for a simple url
   - extension from content type if not exists in url
     - cache hit will be detected by hash that doesn't consider extension?
   - use blocking standard java http client (in java21 virtual threads will help)
   - ignore #fragments from urls
   - reuse project config or overwrite some params
+- 2024-09-06
 - 2024-06-12
 - - write `<project>/.crawl-config.yml`
   - accepts hostnames from urls
@@ -245,7 +255,6 @@ static void main(){
     ```
 
 ## TODO
-
 - [ ] add CLI
 - [ ] crawling
   - [ ] do not overwrite on redownload but rename old version
