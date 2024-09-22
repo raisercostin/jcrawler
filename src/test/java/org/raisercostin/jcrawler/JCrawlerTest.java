@@ -215,4 +215,85 @@ class JCrawlerTest {
     //content-type
     assertThat(dest.length()).isEqualTo(142612);
   }
+
+  @Test
+  void testCulturalMobility() {
+    JCrawler crawler = JCrawler.crawler()
+      .withProjectPath("d:\\home\\raiser\\work\\2024-09-20--mobility\\.jcrawler-mobility")
+      .withUrl("https://cultural-mobility.com")
+      .withTraversalType(TraversalType.BREADTH_FIRST)
+      .withRecomputeLinks(true)
+      .withVerbosity(Verbosity.DEBUG);
+    RichIterable<HyperLink> all = crawler.crawlIterator()
+      .take(10000)
+      .doOnNext(x -> System.out.println("loaded " + x))
+      .memoizeJava();
+    System.out.println("Downloaded: ");
+    all.forEach(x -> System.out.println("%-100s".formatted(x.externalForm)));
+    System.out.println("Downloaded " + all.size() + " urls.");
+    //wget https://op.europa.eu/en/web/who-is-who/archive
+  }
+
+  /**
+  The <source> tag is used to specify multiple media resources for media elements, such as <video>, <audio>, and <picture>.
+  <picture>
+  <source media="(max-width: 799px)" srcset="elva-480w-close-portrait.jpg" />
+  <source media="(min-width: 800px)" srcset="elva-800w.jpg" />
+  <img src="elva-800w.jpg" alt="Chris standing up holding his daughter Elva" />
+  </picture>
+   */
+  @Test
+  void testLinkExtractor() {
+    String contentUrls = """
+        <img decoding=\"async\" src=\"/wp-content/uploads/go-x/u/b0212968-9365-470d-85a5-be30db7481c2/l207,t177,w1738,h1158/image.jpg\"
+        srcset=\"
+        /wp-content/uploads/go-x/u/b0212968-9365-470d-85a5-be30db7481c2/l207,t177,w1738,h1158/image.jpg 1738w,
+        /wp-content/uploads/go-x/u/b0212968-9365-470d-85a5-be30db7481c2/l207,t177,w1738,h1158/image-1366x910.jpg 1366w,
+        /wp-content/uploads/go-x/u/b0212968-9365-470d-85a5-be30db7481c2/l207,t177,w1738,h1158/image-768x512.jpg 768w,
+        /wp-content/uploads/go-x/u/b0212968-9365-470d-85a5-be30db7481c2/l207,t177,w1738,h1158/image-375x250.jpg 375w
+        \" sizes=\"(min-width: 1024px) 100vw,(min-width: 768px) 100vw,(min-width: 0px) 100vw\" class=\"image-img image-geometry-roundedrectangle-1 no-aspect-ratio\" data-shape=\"roundedRectangle\" />
+        """;
+
+    String content = """
+        <img decoding=\"async\" src=\"/wp-content/uploads/go-x/u/b0212968-9365-470d-85a5-be30db7481c2/l207,t177,w1738,h1158/image.jpg\" srcset=\"/wp-content/uploads/go-x/u/b0212968-9365-470d-85a5-be30db7481c2/l207,t177,w1738,h1158/image.jpg 1738w,/wp-content/uploads/go-x/u/b0212968-9365-470d-85a5-be30db7481c2/l207,t177,w1738,h1158/image-1366x910.jpg 1366w,/wp-content/uploads/go-x/u/b0212968-9365-470d-85a5-be30db7481c2/l207,t177,w1738,h1158/image-768x512.jpg 768w,/wp-content/uploads/go-x/u/b0212968-9365-470d-85a5-be30db7481c2/l207,t177,w1738,h1158/image-375x250.jpg 375w\" sizes=\"(min-width: 1024px) 100vw,(min-width: 768px) 100vw,(min-width: 0px) 100vw\" class=\"image-img image-geometry-roundedrectangle-1 no-aspect-ratio\" data-shape=\"roundedRectangle\" />
+        """;
+    assertThat(JCrawler.extractLinksFromContent(content, "", "https://www.cultural-mobility.com/")
+      .map(x -> x.externalForm)
+      .mkString("\n")).isEqualTo(
+        """
+            https://www.cultural-mobility.com/wp-content/uploads/go-x/u/b0212968-9365-470d-85a5-be30db7481c2/l207,t177,w1738,h1158/image.jpg
+            https://www.cultural-mobility.com/wp-content/uploads/go-x/u/b0212968-9365-470d-85a5-be30db7481c2/l207,t177,w1738,h1158/image.jpg
+            https://www.cultural-mobility.com/,/wp-content/uploads/go-x/u/b0212968-9365-470d-85a5-be30db7481c2/l207,t177,w1738,h1158/image-1366x910.jpg
+            https://www.cultural-mobility.com/,/wp-content/uploads/go-x/u/b0212968-9365-470d-85a5-be30db7481c2/l207,t177,w1738,h1158/image-768x512.jpg
+            https://www.cultural-mobility.com/,/wp-content/uploads/go-x/u/b0212968-9365-470d-85a5-be30db7481c2/l207,t177,w1738,h1158/image-375x250.jpg""");
+  }
+
+  @Test
+  void testLinkExtractor2() {
+    String content = """
+        <img decoding="async" src="/wp-content/uploads/go-x/u/c48e3c26-1930-4664-86d2-ce59dd110b57/l468,t0,w427,h1993/image.jpg" srcset="/wp-content/uploads/go-x/u/c48e3c26-1930-4664-86d2-ce59dd110b57/l468,t0,w427,h1993/image.jpg 427w,/wp-content/uploads/go-x/u/c48e3c26-1930-4664-86d2-ce59dd110b57/l468,t0,w427,h1993/image-320x1494.jpg 320w,/wp-content/uploads/go-x/u/c48e3c26-1930-4664-86d2-ce59dd110b57/l468,t0,w427,h1993/image-228x1064.jpg 228w,/wp-content/uploads/go-x/u/c48e3c26-1930-4664-86d2-ce59dd110b57/l468,t0,w427,h1993/image-256x1195.jpg 256w,/wp-content/uploads/go-x/u/c48e3c26-1930-4664-86d2-ce59dd110b57/l468,t0,w427,h1993/image-375x1750.jpg 375w" sizes="(min-width: 1024px) 17vw,(min-width: 768px) 33vw,(min-width: 0px) 100vw" class="image-img image-geometry-rectangle-1 no-aspect-ratio" data-shape="rectangle">
+        """;
+    /**
+     * src="
+     * /wp-content/uploads/go-x/u/c48e3c26-1930-4664-86d2-ce59dd110b57/l468,t0,w427,h1993/image.jpg
+     * " srcset="
+     * /wp-content/uploads/go-x/u/c48e3c26-1930-4664-86d2-ce59dd110b57/l468,t0,w427,h1993/image.jpg 427w,
+     * /wp-content/uploads/go-x/u/c48e3c26-1930-4664-86d2-ce59dd110b57/l468,t0,w427,h1993/image-320x1494.jpg 320w,
+     * /wp-content/uploads/go-x/u/c48e3c26-1930-4664-86d2-ce59dd110b57/l468,t0,w427,h1993/image-228x1064.jpg 228w,
+     * /wp-content/uploads/go-x/u/c48e3c26-1930-4664-86d2-ce59dd110b57/l468,t0,w427,h1993/image-256x1195.jpg 256w,
+     * /wp-content/uploads/go-x/u/c48e3c26-1930-4664-86d2-ce59dd110b57/l468,t0,w427,h1993/image-375x1750.jpg 375w
+     * " sizes="(min-width: 1024px) 17vw,(min-width: 768px) 33vw,(min-width: 0px) 100vw" class="image-img image-geometry-rectangle-1 no-aspect-ratio" data-shape="rectangle">
+     */
+
+    assertThat(JCrawler.extractLinksFromContent(content, "", "https://www.cultural-mobility.com/")
+      .map(x -> x.externalForm)
+      .mkString("\n")).isEqualTo(
+        """
+            https://www.cultural-mobility.com/wp-content/uploads/go-x/u/c48e3c26-1930-4664-86d2-ce59dd110b57/l468,t0,w427,h1993/image.jpg
+            https://www.cultural-mobility.com/wp-content/uploads/go-x/u/c48e3c26-1930-4664-86d2-ce59dd110b57/l468,t0,w427,h1993/image.jpg
+            https://www.cultural-mobility.com/wp-content/uploads/go-x/u/c48e3c26-1930-4664-86d2-ce59dd110b57/l468,t0,w427,h1993/image-320x1494.jpg
+            https://www.cultural-mobility.com/wp-content/uploads/go-x/u/c48e3c26-1930-4664-86d2-ce59dd110b57/l468,t0,w427,h1993/image-228x1064.jpg
+            https://www.cultural-mobility.com/wp-content/uploads/go-x/u/c48e3c26-1930-4664-86d2-ce59dd110b57/l468,t0,w427,h1993/image-256x1195.jpg
+            https://www.cultural-mobility.com/wp-content/uploads/go-x/u/c48e3c26-1930-4664-86d2-ce59dd110b57/l468,t0,w427,h1993/image-375x1750.jpg""");
+  }
 }

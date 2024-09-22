@@ -226,6 +226,19 @@ static void main(){
   - use blocking standard java http client (in java21 virtual threads will help)
   - ignore #fragments from urls
   - reuse project config or overwrite some params
+- [ ] Improve link detector to be exhaustive
+  - img src srcset - done
+  - style url <div style="url('/wp-content/uploads/go-x/u/54f9f472-9729-4799-b18d-f0e34398a8cf/image.jpg');"></div>
+- [ ] Content extraction
+  - ignore changes from crawl to crawl - as being plugins artifacts
+- 2024-09-22
+  - improve extracting images from srcset including containing commas in urls
+  - save non 200 http response code in url - you can delete them or store in other place
+  - use extension from url or from content type if present
+  - save in /index.html for html urls ending in /
+  - crawled site is navigable locally by running `npx http-server -e "" -i`
+  - properly download binaries
+  - migrate already existing content to use new downloading layout
 - 2024-09-06
 - 2024-06-12
 - - write `<project>/.crawl-config.yml`

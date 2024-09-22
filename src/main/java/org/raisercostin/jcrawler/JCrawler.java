@@ -239,8 +239,8 @@ public class JCrawler implements Callable<Integer> {
   }
 
   private static JCrawler of(DirLocation projectDir, Seq<String> urls) {
-    JCrawler crawler = new JCrawler(null, TraversalType.BREADTH_FIRST, Nodes.json, new PicocliDir(projectDir), -1, 3,
-      null, Duration.ofDays(100), null, null, Verbosity.INFO, false, null, null).withUrlsAndAccept(urls);
+    JCrawler crawler = new JCrawler(null, TraversalType.BREADTH_FIRST, Nodes.json, false, new PicocliDir(projectDir),
+      -1, 3, null, Duration.ofDays(100), null, null, Verbosity.INFO, false, null, null, true).withUrlsAndAccept(urls);
     return crawler;
   }
 
@@ -250,10 +250,102 @@ public class JCrawler implements Callable<Integer> {
     //regular expressions with named group consumes 17% of all time
     //("href", "text")
   }
+  private static Pattern urlInStyleExp() {
+    return Pattern.compile("(?i)url\\(['\"]?([^'\")]+)['\"]?\\)");
+}
 
-  private final static Seq<Pattern> allExp = API.Seq(exp("'"), exp("\\\""));
+  //<img decoding="async" src="/wp-content/uploads/go-x/u/83df0416-985d-4080-a869-ac3616c437f7/l12,t0,w192,h192/image.png"
+  // srcset="/wp-content/uploads/go-x/u/83df0416-985d-4080-a869-ac3616c437f7/l12,t0,w192,h192/image.png 192w,
+  //         /wp-content/uploads/go-x/u/83df0416-985d-4080-a869-ac3616c437f7/l12,t0,w192,h192/image-125x125.png 125w
+  //" sizes="(min-width: 1024px) 320px,(min-width: 960px) 320px,(min-width: 768px) 33vw,(min-width: 0px) 33vw"
+  //class="image-img image-geometry-circle-1 no-aspect-ratio" data-shape="circle" />
+  ///wp-content/uploads/go-x/u/83df0416-985d-4080-a869-ac3616c437f7/l12,t0,w192,h192/image.png
+  //  private static Pattern imgExp(String sep) {
+  //    String regex = "(?i)(?s)<img[^>]*\\s+src=" + sep + "([^" + sep + "]*)" + sep + "(?:[^>]*\\s+srcset=" + sep + "([^"
+  //        + sep
+  //        + "]*)" + sep + ")?[^>]*>";
+  //    return Pattern.compile(regex);
+  //  }
 
-  private static io.vavr.collection.Iterator<HyperLink> extractLinksFromContent(final String content,
+  private static final Seq<Pattern> allExp = API.Seq(exp("'"), exp("\\\""), imgExp("'"), imgExp("\\\""),
+    urlInStyleExp());
+
+  private static Pattern imgExp(String sep) {
+    return Pattern
+      .compile("(?i)(?s)<img[^>]*\\s+src=" + sep + "([^" + sep + "]*)" + sep + "(?:[^>]*\\s+srcset=" + sep + "([^" + sep
+          + "]*)" + sep + ")?[^>]*>");
+  }
+
+  static io.vavr.collection.Iterator<HyperLink> extractLinksFromContent(final String content,
+      String source,
+      String sourceUrl) {
+    io.vavr.collection.Iterator<HyperLink> result;
+    result = allExp.iterator().flatMap(exp -> {
+      io.vavr.collection.Iterator<Matcher> all = io.vavr.collection.Iterator.continually(exp.matcher(content))
+        .takeWhile(matcher -> matcher.find());
+      return all.flatMap(m -> {
+        String href = m.group(1).trim();
+        String srcset = "";
+
+        // Safely check if group 2 exists before accessing it
+        if (m.groupCount() >= 2 && m.group(2) != null) {
+          srcset = m.group(2).trim();
+        }
+
+        // Create iterator for src and all srcset entries
+        io.vavr.collection.List<HyperLink> links = io.vavr.collection.List
+          .of(HyperLink.of(href, "", null, m.group().trim(), sourceUrl, source));
+
+        if (!srcset.isEmpty()) {
+          // Split srcset by URLs followed by space, number, and 'w' or 'x'
+          Pattern srcsetPattern = Pattern.compile("([^\\s]+)\\s*(\\d+(?:w|x))(?=,|$),?");
+          Matcher srcsetMatcher = srcsetPattern.matcher(srcset);
+
+          while (srcsetMatcher.find()) {
+            String url = srcsetMatcher.group(1).trim(); // The URL part
+            String descriptor = srcsetMatcher.groupCount() >= 2 && srcsetMatcher.group(2) != null
+                ? srcsetMatcher.group(2).trim()
+                : ""; // Width or density descriptor (e.g., "1366w" or "2x")
+            links = links.append(HyperLink.of(url, descriptor, null, m.group().trim(), sourceUrl, source));
+          }
+        }
+
+        return links.iterator();
+      });
+    });
+    return result;
+  }
+
+  //
+  //  //private final static Seq<Pattern> allExp = API.Seq(exp("'"), exp("\\\""));
+  //  static io.vavr.collection.Iterator<HyperLink> extractLinksFromContent(final String content,
+  //      String source,
+  //      String sourceUrl) {
+  //    io.vavr.collection.Iterator<HyperLink> result;
+  //    result = allExp.iterator().flatMap(exp -> {
+  //      io.vavr.collection.Iterator<Matcher> all = io.vavr.collection.Iterator.continually(exp.matcher(content))
+  //        .takeWhile(matcher -> matcher.find());
+  //      return all.flatMap(m -> {
+  //        String href = m.group(1).trim();
+  //        String srcset = m.group(2) != null ? m.group(2).trim() : "";
+  //
+  //        // Create iterator for src and all srcset entries
+  //        io.vavr.collection.List<HyperLink> links = io.vavr.collection.List
+  //          .of(HyperLink.of(href, "", null, m.group().trim(), sourceUrl, source));
+  //        if (!srcset.isEmpty()) {
+  //          String[] srcsetLinks = srcset.split(",\\s*");
+  //          for (String link : srcsetLinks) {
+  //            String[] linkParts = link.split("\\s+");
+  //            links = links.append(HyperLink.of(linkParts[0].trim(), "", null, m.group().trim(), sourceUrl, source));
+  //          }
+  //        }
+  //        return links.iterator();
+  //      });
+  //    });
+  //    return result;
+  //  }
+
+  private static io.vavr.collection.Iterator<HyperLink> extractLinksFromContentOld(final String content,
       String source,
       String sourceUrl) {
     io.vavr.collection.Iterator<HyperLink> result;
@@ -324,6 +416,9 @@ public class JCrawler implements Callable<Integer> {
   public TraversalType traversalType = TraversalType.PARALLEL_BREADTH_FIRST;
   @JsonIgnore
   public JacksonNodes linksNodes = Nodes.json;
+  @picocli.CommandLine.Option(names = { "--recomputeLinks" }, description = "Extract links again from content")
+  public boolean recomputeLinks = false;
+
   @picocli.CommandLine.Option(names = { "-p", "--project" },
       description = "Project dir for config and crawled content.",
       converter = LocationConverter.class)
@@ -363,6 +458,8 @@ public class JCrawler implements Callable<Integer> {
   @picocli.CommandLine.Option(names = { "--acceptHostname" }, description = "Template to accept urls with this prefix.")
   public String acceptHostname = "{http|https}://{www.|}%s";
   public String crawlFormat = "";
+  @picocli.CommandLine.Option(names = { "--migrate" }, description = "Migrate takes time to re-read metadata")
+  public boolean migrate = true;
 
   private JCrawler() {
   }
@@ -540,12 +637,13 @@ public class JCrawler implements Callable<Integer> {
       }
       Metadata metadata = null;
       var contentUid = config.cached(SlugEscape.contentUid(href.externalForm));
+      contentUid = contentUid.parentRef().get().child(".index").child(contentUid.filename());
       var destInitial = config.cached(SlugEscape.contentPathInitial(href.externalForm)).asWritableFile();
       WritableFileLocation dest = destInitial;
 
-      var destFromSymlink = contentUid.asSymlink().map(x -> x.getTarget());
+      var destFromSymlink = contentUid.existingRef().map(x -> x.userSymlinkTarget());
       var metaJson2 = destFromSymlink.map(x -> x.meta("", ".meta.json"));
-      boolean exists = contentUid.exists() && contentUid.isSymlink() && destFromSymlink.get().exists()
+      boolean exists = contentUid.exists() && /* contentUid.isSymlink() && */ destFromSymlink.get().exists()
           && metaJson2.get().exists();
       //      WritableFileLocation old = config.findOldFile(href);
       //      WritableFileLocation dest = config.cached(href).asWritableFile();
@@ -571,7 +669,8 @@ public class JCrawler implements Callable<Integer> {
             metadata.addField("crawler.slug", href.slug());
             dest = config.cached(SlugEscape.contentPathFinal(href.externalForm, metadata)).asWritableFile();
             contentUid.asPathLocation().deleteFile(DeleteOptions.deleteByRenameOption().withIgnoreNonExisting(true));
-            contentUid.symlinkTo(dest);
+            contentUid.userSymlinkTo(dest);
+            destInitial.rename(dest);
             ReferenceLocation metaJson = dest.meta("", ".meta.json");
             //dest.touch();
             //metaJson.asPathLocation().write("").deleteFile(DeleteOptions.deletePermanent());
@@ -581,13 +680,33 @@ public class JCrawler implements Callable<Integer> {
             failingServers.put(hostname, href.externalForm);
             metadata = Metadata.error(href.externalForm, e);
             contentUid.asPathLocation().deleteFile(DeleteOptions.deleteByRenameOption().withIgnoreNonExisting(true));
-            contentUid.symlinkTo(destInitial);
+            contentUid.userSymlinkTo(destInitial);
             ReferenceLocation metaJson = destInitial.meta("", ".meta.json");
             metaJson.asPathLocation().write(Nodes.json.toString(metadata));
           }
         } finally {
           log.info("download from url #{} done [{}]", token, href.externalForm);
           tokenQueue.put(token);
+        }
+      } else {
+        dest = destFromSymlink.get().asWritableFile();
+        //recompute meta
+        if (config.migrate) {
+          ReferenceLocation metaJson3 = dest.meta("", ".meta.json");
+          String metaContent = metaJson3.asReadableFile().readContent();
+          Metadata meta = metaContent.isEmpty() ? new Metadata() : Nodes.json.toObject(metaContent, Metadata.class);
+          WritableFileLocation destRecomputed = config.cached(SlugEscape.contentPathFinal(href.externalForm, meta))
+            .asWritableFile();
+          var metaJson3Recomputed = destRecomputed.meta("", ".meta.json").asWritableFile();
+          metaJson3.asWritableFile().rename((WritableFileLocation) metaJson3Recomputed.mkdirOnParentIfNeeded());
+          dest.rename((WritableFileLocation) destRecomputed.mkdirOnParentIfNeeded());
+          contentUid.userSymlinkTo(dest);
+          //links should also be renamed?
+
+          dest = destRecomputed;
+          metadata = meta;
+        } else {
+          dest = config.cached(SlugEscape.contentPathFinal(href.externalForm, metadata)).asWritableFile();
         }
       }
 
@@ -606,7 +725,9 @@ public class JCrawler implements Callable<Integer> {
         try {
           log.debug("download from cache [{}]", href.externalForm);
           ReferenceLocation metaJson3 = dest.meta("", ".meta.json");
-          links = extractLinksFromDisk(dest, metaJson3);
+          String metaContent = metaJson3.asReadableFile().readContent();
+          Metadata meta = metaContent.isEmpty() ? new Metadata() : Nodes.json.toObject(metaContent, Metadata.class);
+          links = extractLinksInMemory(dest, meta);
         } finally {
           log.debug("download from cache done [{}]", href.externalForm);
         }
@@ -663,12 +784,6 @@ public class JCrawler implements Callable<Integer> {
       }
     }
 
-    private Traversable<HyperLink> extractLinksFromDisk(WritableFileLocation source, ReferenceLocation metaJson) {
-      String metaContent = metaJson.asReadableFile().readContent();
-      Metadata meta = metaContent.isEmpty() ? new Metadata() : Nodes.json.toObject(metaContent, Metadata.class);
-      return extractLinksInMemory(source, meta);
-    }
-
     //val notParsedUrls = Seq("javascript", "tel")
     //Extract links from content taking into consideration the base url but also the possible <base> tag attribute.
     //<base href="http://www.cartierbratieni.ro/" />
@@ -679,7 +794,7 @@ public class JCrawler implements Callable<Integer> {
       }
       JacksonNodes nodes = config.linksNodes;
       ReferenceLocation metaLinks = source.meta("", ".links.json");
-      if (metaLinks.exists()) {
+      if (metaLinks.exists() && !config.recomputeLinks) {
         try {
           io.vavr.collection.Iterator<@NonNull HyperLink> all = nodes.toIterator(
             metaLinks.asReadableFile().readContent(),
