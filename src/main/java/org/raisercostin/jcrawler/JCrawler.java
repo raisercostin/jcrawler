@@ -246,23 +246,51 @@ public class JCrawler implements Callable<Integer> {
     return crawler;
   }
 
-  private static Pattern exp(String sep) {
-    return Pattern
-      .compile("(?i)(?s)<a[^>]*\\s+href=" + sep + "([^" + sep + "#]*)(#[^" + sep + "]*)?" + sep + "[^>]*>(.*?)</a>");
-    //regular expressions with named group consumes 17% of all time
-    //("href", "text")
+  @AllArgsConstructor
+  public static class LinkMatcher {
+    public final Pattern pattern;
+    public final boolean hasUrl;
+    public final boolean hasSrcSet;
+    public final boolean hasDirective;
   }
 
-  private static Pattern urlInStyleExp() {
-    return Pattern.compile("(?i)url\\(['\"]?([^'\")]+)['\"]?\\)");
+  private static LinkMatcher exp(String sep) {
+    Pattern pattern = Pattern.compile("(?i)(?s)<a[^>]*\\s+href=" + sep + "(?<url>[^" + sep + "#]*)(#[^" + sep + "]*)?"
+        + sep + "[^>]*>(?<text>.*?)</a>");
+    return new LinkMatcher(pattern, true, false, false);
   }
 
-  private static Pattern linkTagExp(String sep) {
-    return Pattern.compile("(?i)<link[^>]*\\s+href=" + sep + "([^" + sep + "]*)" + sep + "[^>]*>");
+  //regular expressions with named group consumes 17% of all time
+  //("href", "text")
+  private static LinkMatcher urlInStyleExp() {
+    Pattern pattern = Pattern.compile("(?i)url\\(['\"]?(?<url>[^'\")]+)['\"]?\\)");
+    return new LinkMatcher(pattern, true, false, false);
   }
 
-  private static Pattern robotsTxtExp() {
-    return Pattern.compile("(?i)(Sitemap|Allow|Disallow):\\s*([^\\s]+)");
+  private static LinkMatcher linkTagExp(String sep) {
+    Pattern pattern = Pattern.compile("(?i)<link[^>]*\\s+href=" + sep + "(?<url>[^" + sep + "]*)" + sep + "[^>]*>");
+    return new LinkMatcher(pattern, true, false, false);
+  }
+
+  private static LinkMatcher robotsTxtExp() {
+    Pattern pattern = Pattern.compile("(?i)(?<directive>Sitemap|Allow|Disallow):\\s*(?<url>[^\\s]+)");
+    return new LinkMatcher(pattern, true, false, true);
+  }
+
+  private static LinkMatcher imgExp(String sep) {
+    Pattern pattern = Pattern.compile("(?i)(?s)<img[^>]*\\s+src=" + sep + "(?<url>[^" + sep + "]*)" + sep
+        + "(?:[^>]*\\s+srcset=" + sep + "(?<srcset>[^" + sep + "]*)" + sep + ")?[^>]*>");
+    return new LinkMatcher(pattern, true, true, false);
+  }
+
+  private static LinkMatcher xmlStylesheetExp() {
+    Pattern pattern = Pattern.compile("(?i)<\\?xml-stylesheet[^>]*\\s+href=['\"](?<url>[^'\"]+)['\"][^>]*\\?>");
+    return new LinkMatcher(pattern, true, false, false);
+  }
+
+  private static LinkMatcher sitemapLocExp() {
+    Pattern pattern = Pattern.compile("(?i)<loc>(?<url>[^<]+)</loc>");
+    return new LinkMatcher(pattern, true, false, false);
   }
 
   //  <link rel="shortcut icon" href="/wp-content/uploads/go-x/u/fd3bbf89-20d4-4067-b378-11070f9cb39e/w16,h16,rtfit,bg,el1,ex1,fico/image.ico?v=1726218050425" type="image/x-icon" />
@@ -278,44 +306,44 @@ public class JCrawler implements Callable<Integer> {
   //        + "]*)" + sep + ")?[^>]*>";
   //    return Pattern.compile(regex);
   //  }
-
-  private static final Seq<Pattern> allExp = API.Seq(
+  // Define all patterns using the LinkMatcher class
+  private static final List<LinkMatcher> allLinkMatchers = List.of(
     exp("'"),
     exp("\\\""),
     imgExp("'"),
     imgExp("\\\""),
     urlInStyleExp(),
     linkTagExp("'"),
-    linkTagExp("\\\"")
-  //,
-  //robotsTxtExp()
+    linkTagExp("\\\""),
+    robotsTxtExp(),
+    xmlStylesheetExp(),
+    sitemapLocExp()
+  //
   );
 
-  private static Pattern imgExp(String sep) {
-    return Pattern
-      .compile("(?i)(?s)<img[^>]*\\s+src=" + sep + "([^" + sep + "]*)" + sep + "(?:[^>]*\\s+srcset=" + sep + "([^" + sep
-          + "]*)" + sep + ")?[^>]*>");
-  }
-
+  // The extractor logic
   static io.vavr.collection.Iterator<HyperLink> extractLinksFromContent(final String content,
       String source,
       String sourceUrl) {
     io.vavr.collection.Iterator<HyperLink> result;
-    result = allExp.iterator().flatMap(exp -> {
-      io.vavr.collection.Iterator<Matcher> all = io.vavr.collection.Iterator.continually(exp.matcher(content))
-        .takeWhile(matcher -> matcher.find());
-      return all.flatMap(m -> {
-        String href = m.group(1).trim();
-        String srcset = "";
+    result = allLinkMatchers.iterator().flatMap(linkMatcher -> {
+      Matcher matcher = linkMatcher.pattern.matcher(content);
+      io.vavr.collection.Iterator<Matcher> allMatches = io.vavr.collection.Iterator.continually(matcher)
+        .takeWhile(m -> m.find());
 
-        // Safely check if group 2 exists before accessing it
-        if (m.groupCount() >= 2 && m.group(2) != null) {
-          srcset = m.group(2).trim();
+      return allMatches.flatMap(m -> {
+        String url = linkMatcher.hasUrl ? m.group("url").trim() : null;
+        String directive = linkMatcher.hasDirective ? m.group("directive") != null ? m.group("directive").trim() : ""
+            : null;
+        String srcset = linkMatcher.hasSrcSet && m.group("srcset") != null ? m.group("srcset").trim() : "";
+
+        if (url == null) {
+          return io.vavr.collection.List.<HyperLink>empty().iterator();
         }
 
         // Create iterator for src and all srcset entries
         io.vavr.collection.List<HyperLink> links = io.vavr.collection.List
-          .of(HyperLink.of(href, "", null, m.group().trim(), sourceUrl, source));
+          .of(HyperLink.of(url, directive != null ? directive : "", null, m.group().trim(), sourceUrl, source));
 
         if (!srcset.isEmpty()) {
           // Split srcset by URLs followed by space, number, and 'w' or 'x'
@@ -323,11 +351,11 @@ public class JCrawler implements Callable<Integer> {
           Matcher srcsetMatcher = srcsetPattern.matcher(srcset);
 
           while (srcsetMatcher.find()) {
-            String url = srcsetMatcher.group(1).trim(); // The URL part
+            String srcsetUrl = srcsetMatcher.group(1).trim(); // The URL part
             String descriptor = srcsetMatcher.groupCount() >= 2 && srcsetMatcher.group(2) != null
                 ? srcsetMatcher.group(2).trim()
                 : ""; // Width or density descriptor (e.g., "1366w" or "2x")
-            links = links.append(HyperLink.of(url, descriptor, null, m.group().trim(), sourceUrl, source));
+            links = links.append(HyperLink.of(srcsetUrl, descriptor, null, m.group().trim(), sourceUrl, source));
           }
         }
 
@@ -365,19 +393,19 @@ public class JCrawler implements Callable<Integer> {
   //    });
   //    return result;
   //  }
-
-  private static io.vavr.collection.Iterator<HyperLink> extractLinksFromContentOld(final String content,
-      String source,
-      String sourceUrl) {
-    io.vavr.collection.Iterator<HyperLink> result;
-    result = allExp.iterator().flatMap(exp -> {
-      io.vavr.collection.Iterator<Matcher> all = io.vavr.collection.Iterator.continually(exp.matcher(content))
-        .takeWhile(matcher -> matcher.find());
-      return all.map(
-        m -> HyperLink.of(m.group(1).trim(), m.group(3).trim(), m.group(2), m.group().trim(), sourceUrl, source));
-    });
-    return result;
-  }
+  //
+  //  private static io.vavr.collection.Iterator<HyperLink> extractLinksFromContentOld(final String content,
+  //      String source,
+  //      String sourceUrl) {
+  //    io.vavr.collection.Iterator<HyperLink> result;
+  //    result = allExp.iterator().flatMap(exp -> {
+  //      io.vavr.collection.Iterator<Matcher> all = io.vavr.collection.Iterator.continually(exp.matcher(content))
+  //        .takeWhile(matcher -> matcher.find());
+  //      return all.map(
+  //        m -> HyperLink.of(m.group(1).trim(), m.group(3).trim(), m.group(2), m.group().trim(), sourceUrl, source));
+  //    });
+  //    return result;
+  //  }
 
   public enum TraversalType {
     PARALLEL_BREADTH_FIRST {
@@ -847,7 +875,9 @@ public class JCrawler implements Callable<Integer> {
       //Option<String> contentType = meta.responseHeaders.getContentType()==MediaType.TEXT_HTML;
       MediaType contentType = meta.responseHeaders.getContentType();
       boolean isHtmlAnd200 = meta.statusCodeValue == 200 && contentType != null
-          && contentType.getType().equals(MediaType.TEXT_HTML.getType());
+          && (contentType.getType().equals(MediaType.TEXT_HTML.getType())
+              ||
+              contentType.getSubtype().equals(MediaType.APPLICATION_XML.getSubtype()));
       log.info("searching links in [{}] from {}", contentType, source);
       String sourceUrl = meta.url;
       //String sourceUrl = meta2.httpMetaRequestUri().get();

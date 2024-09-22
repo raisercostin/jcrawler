@@ -222,6 +222,11 @@ class JCrawlerTest {
       .withProjectPath("d:\\home\\raiser\\work\\2024-09-20--mobility\\.jcrawler-mobility")
       .withUrl("https://cultural-mobility.com",
         "https://www.cultural-mobility.com/robots.txt",
+        "https://www.cultural-mobility.com/sitemap.xml",
+        "https://www.cultural-mobility.com/sitemap.xml.gz",
+        "https://www.cultural-mobility.com/sitemap.gz",
+        "https://www.cultural-mobility.com/favicon.ico",
+        "https://www.cultural-mobility.com/robots.txt",
         "https://www.cultural-mobility.com/wp-content/themes/gox/public/legal/maps/es-ES.html",
         "https://www.cultural-mobility.com/wp-content/themes/gox/public/legal/websiteTranslator/es-ES.html",
         "https://www.cultural-mobility.com/wp-content/plugins/website-translator/flags/svg/{hu|ro|fr|it|pl|es|en|bg|de}.svg")
@@ -283,18 +288,15 @@ class JCrawlerTest {
         Allow: /wp-admin/admin-ajax.php
 
         Sitemap: https://www.cultural-mobility.com/wp-sitemap.xml
+        ---- wp-sitemap.xml
+        <?xml version="1.0" encoding="UTF-8"?>
+        <?xml-stylesheet type="text/xsl" href="https://www.cultural-mobility.com/wp-sitemap-index.xsl" ?>
+        <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><sitemap><loc>https://www.cultural-mobility.com/wp-sitemap-posts-page-1.xml</loc></sitemap></sitemapindex>
+        --- wp-sitemap-posts-page-1.xml
+        <?xml version="1.0" encoding="UTF-8"?>
+        <?xml-stylesheet type="text/xsl" href="https://www.cultural-mobility.com/wp-sitemap.xsl" ?>
+        <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>https://www.cultural-mobility.com/</loc><lastmod>2024-09-13T09:00:59+00:00</lastmod><changefreq>daily</changefreq></url><url><loc>https://www.cultural-mobility.com/services/</loc><lastmod>2024-09-13T09:00:59+00:00</lastmod><changefreq>daily</changefreq></url><url><loc>https://www.cultural-mobility.com/about-us/</loc><lastmod>2024-09-13T09:00:59+00:00</lastmod><changefreq>daily</changefreq></url><url><loc>https://www.cultural-mobility.com/get-in-touch/</loc><lastmod>2024-09-13T09:00:59+00:00</lastmod><changefreq>daily</changefreq></url><url><loc>https://www.cultural-mobility.com/erasmus-mobilities/</loc><lastmod>2024-09-13T09:00:59+00:00</lastmod><changefreq>daily</changefreq></url><url><loc>https://www.cultural-mobility.com/services/transport/</loc><lastmod>2024-09-13T09:01:00+00:00</lastmod><changefreq>daily</changefreq></url><url><loc>https://www.cultural-mobility.com/courses-for-teachers/</loc><lastmod>2024-09-13T09:01:00+00:00</lastmod><changefreq>daily</changefreq></url><url><loc>https://www.cultural-mobility.com/erasmus-mobilities/job-shadowing/</loc><lastmod>2024-09-13T09:01:00+00:00</lastmod><changefreq>daily</changefreq></url><url><loc>https://www.cultural-mobility.com/services/accommodations-and-meals/</loc><lastmod>2024-09-13T09:01:00+00:00</lastmod><changefreq>daily</changefreq></url><url><loc>https://www.cultural-mobility.com/erasmus-mobilities/vet-internships/</loc><lastmod>2024-09-13T09:01:00+00:00</lastmod><changefreq>daily</changefreq></url><url><loc>https://www.cultural-mobility.com/erasmus-mobilities/school-education/</loc><lastmod>2024-09-13T09:01:01+00:00</lastmod><changefreq>daily</changefreq></url><url><loc>https://www.cultural-mobility.com/services/cultural-visits-and-other-activities/</loc><lastmod>2024-09-13T09:01:01+00:00</lastmod><changefreq>daily</changefreq></url></urlset>
         """;
-    /**
-     * src="
-     * /wp-content/uploads/go-x/u/c48e3c26-1930-4664-86d2-ce59dd110b57/l468,t0,w427,h1993/image.jpg
-     * " srcset="
-     * /wp-content/uploads/go-x/u/c48e3c26-1930-4664-86d2-ce59dd110b57/l468,t0,w427,h1993/image.jpg 427w,
-     * /wp-content/uploads/go-x/u/c48e3c26-1930-4664-86d2-ce59dd110b57/l468,t0,w427,h1993/image-320x1494.jpg 320w,
-     * /wp-content/uploads/go-x/u/c48e3c26-1930-4664-86d2-ce59dd110b57/l468,t0,w427,h1993/image-228x1064.jpg 228w,
-     * /wp-content/uploads/go-x/u/c48e3c26-1930-4664-86d2-ce59dd110b57/l468,t0,w427,h1993/image-256x1195.jpg 256w,
-     * /wp-content/uploads/go-x/u/c48e3c26-1930-4664-86d2-ce59dd110b57/l468,t0,w427,h1993/image-375x1750.jpg 375w
-     * " sizes="(min-width: 1024px) 17vw,(min-width: 768px) 33vw,(min-width: 0px) 100vw" class="image-img image-geometry-rectangle-1 no-aspect-ratio" data-shape="rectangle">
-     */
 
     assertThat(JCrawler.extractLinksFromContent(content, "", "https://www.cultural-mobility.com/")
       .map(x -> x.externalForm)
@@ -307,6 +309,24 @@ class JCrawlerTest {
             https://www.cultural-mobility.com/wp-content/uploads/go-x/u/c48e3c26-1930-4664-86d2-ce59dd110b57/l468,t0,w427,h1993/image-256x1195.jpg
             https://www.cultural-mobility.com/wp-content/uploads/go-x/u/c48e3c26-1930-4664-86d2-ce59dd110b57/l468,t0,w427,h1993/image-375x1750.jpg
             https://www.cultural-mobility.com/wp-content/uploads/go-x/u/fd3bbf89-20d4-4067-b378-11070f9cb39e/w16,h16,rtfit,bg,el1,ex1,fico/image.ico?v=1726218050425
+            https://www.cultural-mobility.com/wp-admin/
+            https://www.cultural-mobility.com/wp-admin/admin-ajax.php
+            https://www.cultural-mobility.com/wp-sitemap.xml
+            https://www.cultural-mobility.com/wp-sitemap-index.xsl
+            https://www.cultural-mobility.com/wp-sitemap.xsl
+            https://www.cultural-mobility.com/wp-sitemap-posts-page-1.xml
+            https://www.cultural-mobility.com/
+            https://www.cultural-mobility.com/services/
+            https://www.cultural-mobility.com/about-us/
+            https://www.cultural-mobility.com/get-in-touch/
+            https://www.cultural-mobility.com/erasmus-mobilities/
+            https://www.cultural-mobility.com/services/transport/
+            https://www.cultural-mobility.com/courses-for-teachers/
+            https://www.cultural-mobility.com/erasmus-mobilities/job-shadowing/
+            https://www.cultural-mobility.com/services/accommodations-and-meals/
+            https://www.cultural-mobility.com/erasmus-mobilities/vet-internships/
+            https://www.cultural-mobility.com/erasmus-mobilities/school-education/
+            https://www.cultural-mobility.com/services/cultural-visits-and-other-activities/
             """
           .trim());
   }
