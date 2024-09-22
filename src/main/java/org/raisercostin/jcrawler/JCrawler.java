@@ -45,7 +45,9 @@ import lombok.ToString;
 import lombok.With;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.text.StringTokenizer;
+import org.apache.poi.hssf.record.BackupRecord;
 import org.checkerframework.checker.nullness.qual.NonNull;
+import org.jedio.RichThrowable;
 import org.jedio.struct.RichIterable;
 import org.raisercostin.jcrawler.RichPicocli.LocationConverter;
 import org.raisercostin.jcrawler.RichPicocli.PicocliDir;
@@ -250,10 +252,20 @@ public class JCrawler implements Callable<Integer> {
     //regular expressions with named group consumes 17% of all time
     //("href", "text")
   }
+
   private static Pattern urlInStyleExp() {
     return Pattern.compile("(?i)url\\(['\"]?([^'\")]+)['\"]?\\)");
-}
+  }
 
+  private static Pattern linkTagExp(String sep) {
+    return Pattern.compile("(?i)<link[^>]*\\s+href=" + sep + "([^" + sep + "]*)" + sep + "[^>]*>");
+  }
+
+  private static Pattern robotsTxtExp() {
+    return Pattern.compile("(?i)(Sitemap|Allow|Disallow):\\s*([^\\s]+)");
+  }
+
+  //  <link rel="shortcut icon" href="/wp-content/uploads/go-x/u/fd3bbf89-20d4-4067-b378-11070f9cb39e/w16,h16,rtfit,bg,el1,ex1,fico/image.ico?v=1726218050425" type="image/x-icon" />
   //<img decoding="async" src="/wp-content/uploads/go-x/u/83df0416-985d-4080-a869-ac3616c437f7/l12,t0,w192,h192/image.png"
   // srcset="/wp-content/uploads/go-x/u/83df0416-985d-4080-a869-ac3616c437f7/l12,t0,w192,h192/image.png 192w,
   //         /wp-content/uploads/go-x/u/83df0416-985d-4080-a869-ac3616c437f7/l12,t0,w192,h192/image-125x125.png 125w
@@ -267,8 +279,17 @@ public class JCrawler implements Callable<Integer> {
   //    return Pattern.compile(regex);
   //  }
 
-  private static final Seq<Pattern> allExp = API.Seq(exp("'"), exp("\\\""), imgExp("'"), imgExp("\\\""),
-    urlInStyleExp());
+  private static final Seq<Pattern> allExp = API.Seq(
+    exp("'"),
+    exp("\\\""),
+    imgExp("'"),
+    imgExp("\\\""),
+    urlInStyleExp(),
+    linkTagExp("'"),
+    linkTagExp("\\\"")
+  //,
+  //robotsTxtExp()
+  );
 
   private static Pattern imgExp(String sep) {
     return Pattern
@@ -670,7 +691,7 @@ public class JCrawler implements Callable<Integer> {
             dest = config.cached(SlugEscape.contentPathFinal(href.externalForm, metadata)).asWritableFile();
             contentUid.asPathLocation().deleteFile(DeleteOptions.deleteByRenameOption().withIgnoreNonExisting(true));
             contentUid.userSymlinkTo(dest);
-            destInitial.rename(dest);
+            destInitial.rename(dest.backupIfExists());
             ReferenceLocation metaJson = dest.meta("", ".meta.json");
             //dest.touch();
             //metaJson.asPathLocation().write("").deleteFile(DeleteOptions.deletePermanent());
@@ -678,7 +699,10 @@ public class JCrawler implements Callable<Integer> {
           } catch (Exception e) {
             log.info("mark failing server[{}]: {}", hostname, Throwables.getRootCause(e).getMessage());
             failingServers.put(hostname, href.externalForm);
-            metadata = Metadata.error(href.externalForm, e);
+            if (metadata == null)
+              metadata = Metadata.error(href.externalForm, e);
+            else
+              metadata.error = RichThrowable.toString(e);
             contentUid.asPathLocation().deleteFile(DeleteOptions.deleteByRenameOption().withIgnoreNonExisting(true));
             contentUid.userSymlinkTo(destInitial);
             ReferenceLocation metaJson = destInitial.meta("", ".meta.json");
@@ -698,8 +722,13 @@ public class JCrawler implements Callable<Integer> {
           WritableFileLocation destRecomputed = config.cached(SlugEscape.contentPathFinal(href.externalForm, meta))
             .asWritableFile();
           var metaJson3Recomputed = destRecomputed.meta("", ".meta.json").asWritableFile();
-          metaJson3.asWritableFile().rename((WritableFileLocation) metaJson3Recomputed.mkdirOnParentIfNeeded());
-          dest.rename((WritableFileLocation) destRecomputed.mkdirOnParentIfNeeded());
+          if (!metaJson3.absoluteAndNormalized().equals(metaJson3Recomputed.absoluteAndNormalized())) {
+            metaJson3.asWritableFile()
+              .rename(metaJson3Recomputed.mkdirOnParentIfNeeded().toPathLocation().backupIfExists());
+          }
+          if (!dest.absoluteAndNormalized().equals(destRecomputed.absoluteAndNormalized())) {
+            dest.rename(destRecomputed.mkdirOnParentIfNeeded().toPathLocation().backupIfExists());
+          }
           contentUid.userSymlinkTo(dest);
           //links should also be renamed?
 
@@ -712,9 +741,10 @@ public class JCrawler implements Callable<Integer> {
 
       Traversable<HyperLink> links = null;
       if (metadata != null) {
-        if (metadata.error != null)
+        if (metadata.error != null) {
+          log.info("mark failing link extraction[{}]: {}", hostname, metadata.error);
           links = API.Seq();
-        else
+        } else
           try {
             links = extractLinksInMemory(dest, metadata);
           } catch (Exception e) {

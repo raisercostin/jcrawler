@@ -220,7 +220,11 @@ class JCrawlerTest {
   void testCulturalMobility() {
     JCrawler crawler = JCrawler.crawler()
       .withProjectPath("d:\\home\\raiser\\work\\2024-09-20--mobility\\.jcrawler-mobility")
-      .withUrl("https://cultural-mobility.com")
+      .withUrl("https://cultural-mobility.com",
+        "https://www.cultural-mobility.com/robots.txt",
+        "https://www.cultural-mobility.com/wp-content/themes/gox/public/legal/maps/es-ES.html",
+        "https://www.cultural-mobility.com/wp-content/themes/gox/public/legal/websiteTranslator/es-ES.html",
+        "https://www.cultural-mobility.com/wp-content/plugins/website-translator/flags/svg/{hu|ro|fr|it|pl|es|en|bg|de}.svg")
       .withTraversalType(TraversalType.BREADTH_FIRST)
       .withRecomputeLinks(true)
       .withVerbosity(Verbosity.DEBUG);
@@ -272,6 +276,13 @@ class JCrawlerTest {
   void testLinkExtractor2() {
     String content = """
         <img decoding="async" src="/wp-content/uploads/go-x/u/c48e3c26-1930-4664-86d2-ce59dd110b57/l468,t0,w427,h1993/image.jpg" srcset="/wp-content/uploads/go-x/u/c48e3c26-1930-4664-86d2-ce59dd110b57/l468,t0,w427,h1993/image.jpg 427w,/wp-content/uploads/go-x/u/c48e3c26-1930-4664-86d2-ce59dd110b57/l468,t0,w427,h1993/image-320x1494.jpg 320w,/wp-content/uploads/go-x/u/c48e3c26-1930-4664-86d2-ce59dd110b57/l468,t0,w427,h1993/image-228x1064.jpg 228w,/wp-content/uploads/go-x/u/c48e3c26-1930-4664-86d2-ce59dd110b57/l468,t0,w427,h1993/image-256x1195.jpg 256w,/wp-content/uploads/go-x/u/c48e3c26-1930-4664-86d2-ce59dd110b57/l468,t0,w427,h1993/image-375x1750.jpg 375w" sizes="(min-width: 1024px) 17vw,(min-width: 768px) 33vw,(min-width: 0px) 100vw" class="image-img image-geometry-rectangle-1 no-aspect-ratio" data-shape="rectangle">
+        <link rel="shortcut icon" href="/wp-content/uploads/go-x/u/fd3bbf89-20d4-4067-b378-11070f9cb39e/w16,h16,rtfit,bg,el1,ex1,fico/image.ico?v=1726218050425" type="image/x-icon" />
+        --- robots.txt
+        User-agent: *
+        Disallow: /wp-admin/
+        Allow: /wp-admin/admin-ajax.php
+
+        Sitemap: https://www.cultural-mobility.com/wp-sitemap.xml
         """;
     /**
      * src="
@@ -294,6 +305,9 @@ class JCrawlerTest {
             https://www.cultural-mobility.com/wp-content/uploads/go-x/u/c48e3c26-1930-4664-86d2-ce59dd110b57/l468,t0,w427,h1993/image-320x1494.jpg
             https://www.cultural-mobility.com/wp-content/uploads/go-x/u/c48e3c26-1930-4664-86d2-ce59dd110b57/l468,t0,w427,h1993/image-228x1064.jpg
             https://www.cultural-mobility.com/wp-content/uploads/go-x/u/c48e3c26-1930-4664-86d2-ce59dd110b57/l468,t0,w427,h1993/image-256x1195.jpg
-            https://www.cultural-mobility.com/wp-content/uploads/go-x/u/c48e3c26-1930-4664-86d2-ce59dd110b57/l468,t0,w427,h1993/image-375x1750.jpg""");
+            https://www.cultural-mobility.com/wp-content/uploads/go-x/u/c48e3c26-1930-4664-86d2-ce59dd110b57/l468,t0,w427,h1993/image-375x1750.jpg
+            https://www.cultural-mobility.com/wp-content/uploads/go-x/u/fd3bbf89-20d4-4067-b378-11070f9cb39e/w16,h16,rtfit,bg,el1,ex1,fico/image.ico?v=1726218050425
+            """
+          .trim());
   }
 }
