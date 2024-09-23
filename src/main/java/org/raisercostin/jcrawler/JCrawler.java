@@ -293,19 +293,6 @@ public class JCrawler implements Callable<Integer> {
     return new LinkMatcher(pattern, true, false, false);
   }
 
-  //  <link rel="shortcut icon" href="/wp-content/uploads/go-x/u/fd3bbf89-20d4-4067-b378-11070f9cb39e/w16,h16,rtfit,bg,el1,ex1,fico/image.ico?v=1726218050425" type="image/x-icon" />
-  //<img decoding="async" src="/wp-content/uploads/go-x/u/83df0416-985d-4080-a869-ac3616c437f7/l12,t0,w192,h192/image.png"
-  // srcset="/wp-content/uploads/go-x/u/83df0416-985d-4080-a869-ac3616c437f7/l12,t0,w192,h192/image.png 192w,
-  //         /wp-content/uploads/go-x/u/83df0416-985d-4080-a869-ac3616c437f7/l12,t0,w192,h192/image-125x125.png 125w
-  //" sizes="(min-width: 1024px) 320px,(min-width: 960px) 320px,(min-width: 768px) 33vw,(min-width: 0px) 33vw"
-  //class="image-img image-geometry-circle-1 no-aspect-ratio" data-shape="circle" />
-  ///wp-content/uploads/go-x/u/83df0416-985d-4080-a869-ac3616c437f7/l12,t0,w192,h192/image.png
-  //  private static Pattern imgExp(String sep) {
-  //    String regex = "(?i)(?s)<img[^>]*\\s+src=" + sep + "([^" + sep + "]*)" + sep + "(?:[^>]*\\s+srcset=" + sep + "([^"
-  //        + sep
-  //        + "]*)" + sep + ")?[^>]*>";
-  //    return Pattern.compile(regex);
-  //  }
   // Define all patterns using the LinkMatcher class
   private static final List<LinkMatcher> allLinkMatchers = List.of(
     exp("'"),
@@ -365,47 +352,6 @@ public class JCrawler implements Callable<Integer> {
     return result;
   }
 
-  //
-  //  //private final static Seq<Pattern> allExp = API.Seq(exp("'"), exp("\\\""));
-  //  static io.vavr.collection.Iterator<HyperLink> extractLinksFromContent(final String content,
-  //      String source,
-  //      String sourceUrl) {
-  //    io.vavr.collection.Iterator<HyperLink> result;
-  //    result = allExp.iterator().flatMap(exp -> {
-  //      io.vavr.collection.Iterator<Matcher> all = io.vavr.collection.Iterator.continually(exp.matcher(content))
-  //        .takeWhile(matcher -> matcher.find());
-  //      return all.flatMap(m -> {
-  //        String href = m.group(1).trim();
-  //        String srcset = m.group(2) != null ? m.group(2).trim() : "";
-  //
-  //        // Create iterator for src and all srcset entries
-  //        io.vavr.collection.List<HyperLink> links = io.vavr.collection.List
-  //          .of(HyperLink.of(href, "", null, m.group().trim(), sourceUrl, source));
-  //        if (!srcset.isEmpty()) {
-  //          String[] srcsetLinks = srcset.split(",\\s*");
-  //          for (String link : srcsetLinks) {
-  //            String[] linkParts = link.split("\\s+");
-  //            links = links.append(HyperLink.of(linkParts[0].trim(), "", null, m.group().trim(), sourceUrl, source));
-  //          }
-  //        }
-  //        return links.iterator();
-  //      });
-  //    });
-  //    return result;
-  //  }
-  //
-  //  private static io.vavr.collection.Iterator<HyperLink> extractLinksFromContentOld(final String content,
-  //      String source,
-  //      String sourceUrl) {
-  //    io.vavr.collection.Iterator<HyperLink> result;
-  //    result = allExp.iterator().flatMap(exp -> {
-  //      io.vavr.collection.Iterator<Matcher> all = io.vavr.collection.Iterator.continually(exp.matcher(content))
-  //        .takeWhile(matcher -> matcher.find());
-  //      return all.map(
-  //        m -> HyperLink.of(m.group(1).trim(), m.group(3).trim(), m.group(2), m.group().trim(), sourceUrl, source));
-  //    });
-  //    return result;
-  //  }
 
   public enum TraversalType {
     PARALLEL_BREADTH_FIRST {
