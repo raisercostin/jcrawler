@@ -21,6 +21,7 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Entities.EscapeMode;
 import org.raisercostin.jedio.MetaInfo;
+import org.raisercostin.jedio.Metadata;
 import org.raisercostin.jedio.path.PathLocation;
 import org.raisercostin.nodes.Nodes;
 
@@ -73,8 +74,16 @@ public class JScraper {
     //    Document jsoup;
     //    String cleanup;
 
-    public MetaInfo httpMeta() {
-      return cached("httpMeta", () -> crawl.readMeta());
+    public Metadata httpMeta() {
+      return cached("httpMeta",
+        () -> {
+          PathLocation metaFile = crawl.withName(x -> x + "#meta--.meta.json");
+          if (metaFile.exists()) {
+            return Nodes.json.toObject(metaFile.readContent(), Metadata.class);
+          } else {
+            return Metadata.empty(null);
+          }
+        });
     }
 
     @SuppressWarnings("unchecked")
@@ -85,14 +94,14 @@ public class JScraper {
     }
 
     public PathLocation jsoupLocation() {
-      return crawl.meta("jsoup", "html");
+      return crawl.companion(".jsoup.html");
     }
 
     @SneakyThrows
     public Document normalizePage() {
       String content = crawl.readContent();
       // content = ExtractorUtils.replaceEntities(content);
-      String url = httpMeta().httpMetaRequestUri().get();
+      String url = httpMeta().httpMetaRequestUri();
       return Jsoup.parse(content, url);
     }
 
@@ -118,7 +127,7 @@ public class JScraper {
 
     @SneakyThrows
     public void scrapPage() {
-      MetaInfo meta = httpMeta();
+      Metadata meta = httpMeta();
       if (meta.httpResponseHeaderContentTypeIsHtml()) {
         writeJsoupCleanup();
       }

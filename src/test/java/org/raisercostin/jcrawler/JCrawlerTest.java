@@ -3,21 +3,18 @@ package org.raisercostin.jcrawler;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
+import java.util.List;
 
 import io.vavr.control.Option;
-import org.jedio.regex.RichRegex;
 import org.jedio.struct.RichIterable;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.raisercostin.jcrawler.JCrawler;
 import org.raisercostin.jcrawler.JCrawler.TraversalType;
 import org.raisercostin.jcrawler.JCrawler.Verbosity;
 import org.raisercostin.jedio.Locations;
-import org.raisercostin.jedio.ReadableFileLocation;
+import org.raisercostin.jedio.Metadata;
 import org.raisercostin.jedio.path.PathLocation;
-import org.raisercostin.jedio.url.WebClientLocation2.RequestResponse;
-import org.raisercostin.jedio.url.WebClientLocation2.RequestResponse.Metadata;
 import org.raisercostin.jscraper.JScraper;
 import reactor.netty.http.HttpProtocol;
 
@@ -165,9 +162,9 @@ class JCrawlerTest {
       .download(url, dest)
       .getMetadata();
     assertThat(metadata.url).isEqualTo(url);
-    assertThat(metadata.urlSanitized()).isEqualTo(url);
-    assertThat(metadata.urlHash()).isEqualTo("9cf4918b061e887f92b45255c8fb5e976eb3a24de28686afe653557a900647ef");
-    assertThat(metadata.path()).isEqualTo("op.europa.eu/documents/d/who-is-who/pdf_archive_eu_whoiswho_202407-en");
+    assertThat(Slug.urlSanitized(url)).isEqualTo(url);
+    assertThat(Slug.urlHash(url)).isEqualTo("9cf4918b061e887f92b45255c8fb5e976eb3a24de28686afe653557a900647ef");
+    assertThat(Slug.path(url)).isEqualTo("op.europa.eu/documents/d/who-is-who/pdf_archive_eu_whoiswho_202407-en");
     assertThat(dest.length()).isEqualTo(28762441L);
   }
 
@@ -186,9 +183,9 @@ class JCrawlerTest {
     //https/http/ftp?
     //name from returned headers - content-disposition - https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Disposition
     assertThat(metadata.url).isEqualTo(url);
-    assertThat(metadata.urlSanitized()).isEqualTo("https://en.m.wikipedia.org/wiki/wget?param=value");
-    assertThat(metadata.urlHash()).isEqualTo("be4b221727d1658df7ae717d21e6507827a5366ab293c234510ae898978795af");
-    assertThat(metadata.path()).isEqualTo("en.m.wikipedia.org/wiki/wget@param=value");
+    assertThat(Slug.urlSanitized(url)).isEqualTo("https://en.m.wikipedia.org/wiki/wget?param=value");
+    assertThat(Slug.urlHash(url)).isEqualTo("be4b221727d1658df7ae717d21e6507827a5366ab293c234510ae898978795af");
+    assertThat(Slug.path(url)).isEqualTo("en.m.wikipedia.org/wiki/wget@param=value");
     //content-type
     assertThat(dest.length()).isEqualTo(142612);
   }
@@ -208,10 +205,9 @@ class JCrawlerTest {
     //https/http/ftp?
     //name from returned headers - content-disposition - https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Disposition
     assertThat(metadata.url).isEqualTo(url);
-    assertThat(metadata.urlSanitized()).isEqualTo("https://en.m.wikipedia.org/wiki/wget?param=value");
-    assertThat(metadata.urlHash()).isEqualTo("be4b221727d1658df7ae717d21e6507827a5366ab293c234510ae898978795af");
-    assertThat(metadata.path()).isEqualTo("en.m.wikipedia.org/wiki/wget@param=value");
-    assertThat(metadata.path()).isEqualTo("en.m.wikipedia.org/wiki/wget@param=value");
+    assertThat(Slug.urlSanitized(url)).isEqualTo("https://en.m.wikipedia.org/wiki/wget?param=value");
+    assertThat(Slug.urlHash(url)).isEqualTo("be4b221727d1658df7ae717d21e6507827a5366ab293c234510ae898978795af");
+    assertThat(Slug.path(url)).isEqualTo("en.m.wikipedia.org/wiki/wget@param=value");
     //content-type
     assertThat(dest.length()).isEqualTo(142612);
   }
@@ -229,7 +225,11 @@ class JCrawlerTest {
         "https://www.cultural-mobility.com/robots.txt",
         "https://www.cultural-mobility.com/wp-content/themes/gox/public/legal/maps/es-ES.html",
         "https://www.cultural-mobility.com/wp-content/themes/gox/public/legal/websiteTranslator/es-ES.html",
-        "https://www.cultural-mobility.com/wp-content/plugins/website-translator/flags/svg/{hu|ro|fr|it|pl|es|en|bg|de}.svg")
+        "https://www.cultural-mobility.com/wp-content/plugins/website-translator/flags/svg/{hu|ro|fr|it|pl|es|en|bg|de}.svg",
+        //javascript
+        "https://www.cultural-mobility.com/wp-includes/js/wp-emoji-release.min.js?ver=6.2.6"
+      //
+      )
       .withTraversalType(TraversalType.BREADTH_FIRST)
       .withRecomputeLinks(true)
       .withVerbosity(Verbosity.DEBUG);
@@ -253,20 +253,10 @@ class JCrawlerTest {
    */
   @Test
   void testLinkExtractor() {
-    String contentUrls = """
-        <img decoding=\"async\" src=\"/wp-content/uploads/go-x/u/b0212968-9365-470d-85a5-be30db7481c2/l207,t177,w1738,h1158/image.jpg\"
-        srcset=\"
-        /wp-content/uploads/go-x/u/b0212968-9365-470d-85a5-be30db7481c2/l207,t177,w1738,h1158/image.jpg 1738w,
-        /wp-content/uploads/go-x/u/b0212968-9365-470d-85a5-be30db7481c2/l207,t177,w1738,h1158/image-1366x910.jpg 1366w,
-        /wp-content/uploads/go-x/u/b0212968-9365-470d-85a5-be30db7481c2/l207,t177,w1738,h1158/image-768x512.jpg 768w,
-        /wp-content/uploads/go-x/u/b0212968-9365-470d-85a5-be30db7481c2/l207,t177,w1738,h1158/image-375x250.jpg 375w
-        \" sizes=\"(min-width: 1024px) 100vw,(min-width: 768px) 100vw,(min-width: 0px) 100vw\" class=\"image-img image-geometry-roundedrectangle-1 no-aspect-ratio\" data-shape=\"roundedRectangle\" />
-        """;
-
     String content = """
         <img decoding=\"async\" src=\"/wp-content/uploads/go-x/u/b0212968-9365-470d-85a5-be30db7481c2/l207,t177,w1738,h1158/image.jpg\" srcset=\"/wp-content/uploads/go-x/u/b0212968-9365-470d-85a5-be30db7481c2/l207,t177,w1738,h1158/image.jpg 1738w,/wp-content/uploads/go-x/u/b0212968-9365-470d-85a5-be30db7481c2/l207,t177,w1738,h1158/image-1366x910.jpg 1366w,/wp-content/uploads/go-x/u/b0212968-9365-470d-85a5-be30db7481c2/l207,t177,w1738,h1158/image-768x512.jpg 768w,/wp-content/uploads/go-x/u/b0212968-9365-470d-85a5-be30db7481c2/l207,t177,w1738,h1158/image-375x250.jpg 375w\" sizes=\"(min-width: 1024px) 100vw,(min-width: 768px) 100vw,(min-width: 0px) 100vw\" class=\"image-img image-geometry-roundedrectangle-1 no-aspect-ratio\" data-shape=\"roundedRectangle\" />
         """;
-    assertThat(JCrawler.extractLinksFromContent(content, "", "https://www.cultural-mobility.com/")
+    assertThat(JCrawler.extractLinksFromContent(0, content, "", "https://www.cultural-mobility.com/")
       .map(x -> x.externalForm)
       .mkString("\n")).isEqualTo(
         """
@@ -296,9 +286,17 @@ class JCrawlerTest {
         <?xml version="1.0" encoding="UTF-8"?>
         <?xml-stylesheet type="text/xsl" href="https://www.cultural-mobility.com/wp-sitemap.xsl" ?>
         <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>https://www.cultural-mobility.com/</loc><lastmod>2024-09-13T09:00:59+00:00</lastmod><changefreq>daily</changefreq></url><url><loc>https://www.cultural-mobility.com/services/</loc><lastmod>2024-09-13T09:00:59+00:00</lastmod><changefreq>daily</changefreq></url><url><loc>https://www.cultural-mobility.com/about-us/</loc><lastmod>2024-09-13T09:00:59+00:00</lastmod><changefreq>daily</changefreq></url><url><loc>https://www.cultural-mobility.com/get-in-touch/</loc><lastmod>2024-09-13T09:00:59+00:00</lastmod><changefreq>daily</changefreq></url><url><loc>https://www.cultural-mobility.com/erasmus-mobilities/</loc><lastmod>2024-09-13T09:00:59+00:00</lastmod><changefreq>daily</changefreq></url><url><loc>https://www.cultural-mobility.com/services/transport/</loc><lastmod>2024-09-13T09:01:00+00:00</lastmod><changefreq>daily</changefreq></url><url><loc>https://www.cultural-mobility.com/courses-for-teachers/</loc><lastmod>2024-09-13T09:01:00+00:00</lastmod><changefreq>daily</changefreq></url><url><loc>https://www.cultural-mobility.com/erasmus-mobilities/job-shadowing/</loc><lastmod>2024-09-13T09:01:00+00:00</lastmod><changefreq>daily</changefreq></url><url><loc>https://www.cultural-mobility.com/services/accommodations-and-meals/</loc><lastmod>2024-09-13T09:01:00+00:00</lastmod><changefreq>daily</changefreq></url><url><loc>https://www.cultural-mobility.com/erasmus-mobilities/vet-internships/</loc><lastmod>2024-09-13T09:01:00+00:00</lastmod><changefreq>daily</changefreq></url><url><loc>https://www.cultural-mobility.com/erasmus-mobilities/school-education/</loc><lastmod>2024-09-13T09:01:01+00:00</lastmod><changefreq>daily</changefreq></url><url><loc>https://www.cultural-mobility.com/services/cultural-visits-and-other-activities/</loc><lastmod>2024-09-13T09:01:01+00:00</lastmod><changefreq>daily</changefreq></url></urlset>
+        --- consent.js
+        <div class="iwt_wrapper" id="iwt-wrapper-44645387"></div><script src='https://www.cultural-mobility.com/wp-content/plugins/go-x-blocks/js/consent/consent.js?ver=1.0.6+d76be5206a' id='gox-script-0-js'></script>
+        <script src='https://www.cultural-mobility.com/wp-content/plugins/go-x-blocks/js/forms/forms.js?ver=1.0.6+d76be5206a' id='gox-script-1-js'></script>
+        <script>
+          window._wpemojiSettings = { "baseUrl": "https:\\/\\/s.w.org\\/images\\/core\\/emoji\\/14.0.0\\/72x72\\/", "ext": ".png", "svgUrl": "https:\\/\\/s.w.org\\/images\\/core\\/emoji\\/14.0.0\\/svg\\/", "svgExt": ".svg", "source": { "concatemoji": "https:\\/\\/www.cultural-mobility.com\\/wp-includes\\/js\\/wp-emoji-release.min.js?ver=6.2.6" } };
+          /*! This file is auto-generated */
+          !function (e, a, t) { var n, r, o, i = a.createElement("canvas"), p = i.getContext && i.getContext("2d"); function s(e, t) { p.clearRect(0, 0, i.width, i.height), p.fillText(e, 0, 0); e = i.toDataURL(); return p.clearRect(0, 0, i.width, i.height), p.fillText(t, 0, 0), e === i.toDataURL() } function c(e) { var t = a.createElement("script"); t.src = e, t.defer = t.type = "text/javascript", a.getElementsByTagName("head")[0].appendChild(t) } for (o = Array("flag", "emoji"), t.supports = { everything: !0, everythingExceptFlag: !0 }, r = 0; r < o.length; r++)t.supports[o[r]] = function (e) { if (p && p.fillText) switch (p.textBaseline = "top", p.font = "600 32px Arial", e) { case "flag": return s("\ud83c\udff3\ufe0f\u200d\u26a7\ufe0f", "\ud83c\udff3\ufe0f\u200b\u26a7\ufe0f") ? !1 : !s("\ud83c\uddfa\ud83c\uddf3", "\ud83c\uddfa\u200b\ud83c\uddf3") && !s("\ud83c\udff4\udb40\udc67\udb40\udc62\udb40\udc65\udb40\udc6e\udb40\udc67\udb40\udc7f", "\ud83c\udff4\u200b\udb40\udc67\u200b\udb40\udc62\u200b\udb40\udc65\u200b\udb40\udc6e\u200b\udb40\udc67\u200b\udb40\udc7f"); case "emoji": return !s("\ud83e\udef1\ud83c\udffb\u200d\ud83e\udef2\ud83c\udfff", "\ud83e\udef1\ud83c\udffb\u200b\ud83e\udef2\ud83c\udfff") }return !1 }(o[r]), t.supports.everything = t.supports.everything && t.supports[o[r]], "flag" !== o[r] && (t.supports.everythingExceptFlag = t.supports.everythingExceptFlag && t.supports[o[r]]); t.supports.everythingExceptFlag = t.supports.everythingExceptFlag && !t.supports.flag, t.DOMReady = !1, t.readyCallback = function () { t.DOMReady = !0 }, t.supports.everything || (n = function () { t.readyCallback() }, a.addEventListener ? (a.addEventListener("DOMContentLoaded", n, !1), e.addEventListener("load", n, !1)) : (e.attachEvent("onload", n), a.attachEvent("onreadystatechange", function () { "complete" === a.readyState && t.readyCallback() })), (e = t.source || {}).concatemoji ? c(e.concatemoji) : e.wpemoji && e.twemoji && (c(e.twemoji), c(e.wpemoji))) }(window, document, window._wpemojiSettings);
+        </script>
         """;
 
-    assertThat(JCrawler.extractLinksFromContent(content, "", "https://www.cultural-mobility.com/")
+    assertThat(JCrawler.extractLinksFromContent(0, content, "", "https://www.cultural-mobility.com/")
       .map(x -> x.externalForm)
       .mkString("\n")).isEqualTo(
         """
@@ -327,7 +325,62 @@ class JCrawlerTest {
             https://www.cultural-mobility.com/erasmus-mobilities/vet-internships/
             https://www.cultural-mobility.com/erasmus-mobilities/school-education/
             https://www.cultural-mobility.com/services/cultural-visits-and-other-activities/
+            https://www.cultural-mobility.com/wp-content/plugins/go-x-blocks/js/consent/consent.js?ver=1.0.6+d76be5206a
+            https://www.cultural-mobility.com/wp-content/plugins/go-x-blocks/js/forms/forms.js?ver=1.0.6+d76be5206a
             """
           .trim());
+  }
+
+  @Test
+  void testCulturalMobilityIndexOnly() {
+    JCrawler crawler = JCrawler.crawler()
+      .withProjectPath(
+        "d:\\home\\raiser\\work\\2024-09-20--mobility\\.jcrawler-mobility\\widget-globo")
+      .withUrl("https://www.cultural-mobility.com/",
+        "https://www.cultural-mobility.com/wp-content/plugins/website-translator/flags/svg/{hu|ro|fr|it|pl|es|en|bg|de}.svg"
+      //
+      )
+      .withTraversalType(TraversalType.BREADTH_FIRST)
+      .withRecomputeLinks(true)
+      .withVerbosity(Verbosity.DEBUG)
+      //.withCacheExpiryDuration(null)
+      .withDepth(1);
+    RichIterable<HyperLink> all = crawler.crawlIterator()
+      .take(10000)
+      .doOnNext(x -> System.out.println("loaded " + x))
+      .memoizeJava();
+    System.out.println("Downloaded: ");
+    all.forEach(x -> System.out.println("%-100s".formatted(x.externalForm)));
+    System.out.println("Downloaded " + all.size() + " urls.");
+    //wget https://op.europa.eu/en/web/who-is-who/archive
+  }
+
+  @Test
+  void testHeadersExtract() {
+    List<String> headers = JCrawler.CrawlerWorker.headers(
+      """
+          Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+          """,
+      "Cookie", "Referer");
+    assertThat(headers.toString()).isEqualTo(
+      "[Accept: text/html, Accept: application/xhtml+xml, Accept: application/xml;q=0.9, Accept: image/avif, Accept: image/webp, Accept: image/apng, Accept: */*;q=0.8, Accept: application/signed-exchange;v=b3;q=0.7]");
+  }
+
+  @Test
+  void testCgiJobs() {
+    JCrawler crawler = JCrawler.crawler()
+      .withProjectPath("d:\\home\\raiser\\work\\.jcrawler-jobs\\cgi")
+      .withUrl("https://cgi.njoyn.com/corp/xweb/xweb.asp?NTKN=c&page=joblisting&clid=21001")
+      .withTraversalType(TraversalType.BREADTH_FIRST)
+      //.withRecomputeLinks(true)
+      .withVerbosity(Verbosity.DEBUG);
+    RichIterable<HyperLink> all = crawler.crawlIterator()
+      .take(1)
+      .doOnNext(x -> System.out.println("loaded " + x))
+      .memoizeJava();
+    System.out.println("Downloaded: ");
+    all.forEach(x -> System.out.println("%-100s".formatted(x.externalForm)));
+    System.out.println("Downloaded " + all.size() + " urls.");
+    //wget https://op.europa.eu/en/web/who-is-who/archive
   }
 }

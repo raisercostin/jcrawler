@@ -2,14 +2,15 @@ package org.raisercostin.jcrawler;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.SocketException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
+import java.net.http.HttpRequest.Builder;
 import java.net.http.HttpResponse;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Properties;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -26,6 +27,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
+import com.google.common.base.Splitter;
 import com.google.common.base.Throwables;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -45,7 +47,6 @@ import lombok.ToString;
 import lombok.With;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.text.StringTokenizer;
-import org.apache.poi.hssf.record.BackupRecord;
 import org.checkerframework.checker.nullness.qual.NonNull;
 import org.jedio.RichThrowable;
 import org.jedio.struct.RichIterable;
@@ -55,15 +56,13 @@ import org.raisercostin.jcrawler.RichPicocli.VavrConverter;
 import org.raisercostin.jedio.DirLocation;
 import org.raisercostin.jedio.FileLocation;
 import org.raisercostin.jedio.Locations;
+import org.raisercostin.jedio.Metadata;
 import org.raisercostin.jedio.ReadableFileLocation;
 import org.raisercostin.jedio.ReferenceLocation;
-import org.raisercostin.jedio.SlugEscape;
 import org.raisercostin.jedio.WritableFileLocation;
-import org.raisercostin.jedio.SlugEscape.Slug;
 import org.raisercostin.jedio.op.DeleteOptions;
 import org.raisercostin.jedio.path.PathLocation;
 import org.raisercostin.jedio.url.WebClientLocation2.RequestResponse;
-import org.raisercostin.jedio.url.WebClientLocation2.RequestResponse.Metadata;
 import org.raisercostin.jedio.url.WebClientLocation2.WebClientFactory;
 import org.raisercostin.jedio.url.WebLocation;
 import org.raisercostin.nodes.JacksonNodes;
@@ -232,7 +231,7 @@ public class JCrawler implements Callable<Integer> {
   public static JCrawler of(WebLocation webLocation, DirLocation cache,
       Option<ReadableFileLocation> whitelistSample) {
     Set<String> whitelist2 = whitelistSample
-      .map(x -> extractLinksFromContent(x.readContent(), null, null)
+      .map(x -> extractLinksFromContent(0, x.readContent(), null, null)
         .map(z -> z.withoutQuery())
         .toSet())
       .getOrNull();
@@ -242,7 +241,8 @@ public class JCrawler implements Callable<Integer> {
 
   private static JCrawler of(DirLocation projectDir, Seq<String> urls) {
     JCrawler crawler = new JCrawler(null, TraversalType.BREADTH_FIRST, Nodes.json, false, new PicocliDir(projectDir),
-      -1, 3, null, Duration.ofDays(100), null, null, Verbosity.INFO, false, null, null, true).withUrlsAndAccept(urls);
+      -1, 3, null, Duration.ofDays(100), null, null, Verbosity.INFO, 100, false, null, null, true)
+        .withUrlsAndAccept(urls);
     return crawler;
   }
 
@@ -283,6 +283,15 @@ public class JCrawler implements Callable<Integer> {
     return new LinkMatcher(pattern, true, true, false);
   }
 
+  //script src=
+  private static LinkMatcher scriptSrc(String sep) {
+    String tag = "script";
+    String attribute = "src";
+    Pattern pattern = Pattern
+      .compile("(?i)(?s)<" + tag + "[^>]*\\s+" + attribute + "=" + sep + "(?<url>[^" + sep + "]*)" + sep);
+    return new LinkMatcher(pattern, true, false, false);
+  }
+
   private static LinkMatcher xmlStylesheetExp() {
     Pattern pattern = Pattern.compile("(?i)<\\?xml-stylesheet[^>]*\\s+href=['\"](?<url>[^'\"]+)['\"][^>]*\\?>");
     return new LinkMatcher(pattern, true, false, false);
@@ -304,14 +313,15 @@ public class JCrawler implements Callable<Integer> {
     linkTagExp("\\\""),
     robotsTxtExp(),
     xmlStylesheetExp(),
-    sitemapLocExp()
+    sitemapLocExp(),
+    scriptSrc("\\\""),
+    scriptSrc("'")
   //
   );
 
   // The extractor logic
-  static io.vavr.collection.Iterator<HyperLink> extractLinksFromContent(final String content,
-      String source,
-      String sourceUrl) {
+  static io.vavr.collection.Iterator<HyperLink> extractLinksFromContent(int depth, final String content,
+      String source, String sourceUrl) {
     io.vavr.collection.Iterator<HyperLink> result;
     result = allLinkMatchers.iterator().flatMap(linkMatcher -> {
       Matcher matcher = linkMatcher.pattern.matcher(content);
@@ -330,7 +340,7 @@ public class JCrawler implements Callable<Integer> {
 
         // Create iterator for src and all srcset entries
         io.vavr.collection.List<HyperLink> links = io.vavr.collection.List
-          .of(HyperLink.of(url, directive != null ? directive : "", null, m.group().trim(), sourceUrl, source));
+          .of(HyperLink.of(url, depth, directive != null ? directive : "", null, m.group().trim(), sourceUrl, source));
 
         if (!srcset.isEmpty()) {
           // Split srcset by URLs followed by space, number, and 'w' or 'x'
@@ -342,7 +352,7 @@ public class JCrawler implements Callable<Integer> {
             String descriptor = srcsetMatcher.groupCount() >= 2 && srcsetMatcher.group(2) != null
                 ? srcsetMatcher.group(2).trim()
                 : ""; // Width or density descriptor (e.g., "1366w" or "2x")
-            links = links.append(HyperLink.of(srcsetUrl, descriptor, null, m.group().trim(), sourceUrl, source));
+            links = links.append(HyperLink.of(srcsetUrl, depth, descriptor, null, m.group().trim(), sourceUrl, source));
           }
         }
 
@@ -351,7 +361,6 @@ public class JCrawler implements Callable<Integer> {
     });
     return result;
   }
-
 
   public enum TraversalType {
     PARALLEL_BREADTH_FIRST {
@@ -448,6 +457,9 @@ public class JCrawler implements Callable<Integer> {
   @picocli.CommandLine.Option(names = { "-v", "--verbosity" },
       description = "Set the verbosity level: ${COMPLETION-CANDIDATES}.")
   public Verbosity verbosity = Verbosity.WARN;
+  @picocli.CommandLine.Option(names = { "-l", "--level" },
+      description = "Limit depth crawling. Given start urls are level 0. All different links from it are level 1.")
+  public int depth = 100;
   @picocli.CommandLine.Option(names = { "--debug" }, description = "Show stack trace")
   public boolean debug = false;
   @picocli.CommandLine.Option(names = { "--acceptHostname" }, description = "Template to accept urls with this prefix.")
@@ -494,7 +506,7 @@ public class JCrawler implements Callable<Integer> {
   }
 
   public WritableFileLocation findOldFile(HyperLink href) {
-    RichIterable<Slug> slugs = SlugEscape.slugs(href.externalForm);
+    RichIterable<Slug> slugs = Slug.slugs(href.externalForm);
     return (WritableFileLocation) slugs.map(slug -> cached(slug)).find(file -> file.exists()).get();
   }
 
@@ -508,7 +520,7 @@ public class JCrawler implements Callable<Integer> {
   }
 
   public FileLocation cachedFile(String url) {
-    Slug slug = SlugEscape.slugs(url).head();
+    Slug slug = Slug.slugs(url).head();
     return (FileLocation) cached(slug);
   }
 
@@ -525,6 +537,9 @@ public class JCrawler implements Callable<Integer> {
   }
 
   public boolean forceDownload(HyperLink href, WritableFileLocation dest) {
+    if (cacheExpiryDuration == null) {
+      return true;
+    }
     return dest.modifiedDateTime().toInstant().isBefore(Instant.now().minus(cacheExpiryDuration));
   }
 
@@ -594,6 +609,9 @@ public class JCrawler implements Callable<Integer> {
     }
 
     private boolean accept2(HyperLink link) {
+      if (link.depth > config.depth) {
+        return false;
+      }
       if (accept == null) {
         return false;
       }
@@ -631,9 +649,9 @@ public class JCrawler implements Callable<Integer> {
         return API.Seq();
       }
       Metadata metadata = null;
-      var contentUid = config.cached(SlugEscape.contentUid(href.externalForm));
+      var contentUid = config.cached(Slug.contentUid(href.externalForm));
       contentUid = contentUid.parentRef().get().child(".index").child(contentUid.filename());
-      var destInitial = config.cached(SlugEscape.contentPathInitial(href.externalForm)).asWritableFile();
+      var destInitial = config.cached(Slug.contentPathInitial(href.externalForm)).asWritableFile();
       WritableFileLocation dest = destInitial;
 
       var destFromSymlink = contentUid.existingRef().map(x -> x.userSymlinkTarget());
@@ -662,7 +680,7 @@ public class JCrawler implements Callable<Integer> {
             RequestResponse content = download(url, destInitial);
             metadata = content.getMetadata();
             metadata.addField("crawler.slug", href.slug());
-            dest = config.cached(SlugEscape.contentPathFinal(href.externalForm, metadata)).asWritableFile();
+            dest = config.cached(Slug.contentPathFinal(href.externalForm, metadata)).asWritableFile();
             contentUid.asPathLocation().deleteFile(DeleteOptions.deleteByRenameOption().withIgnoreNonExisting(true));
             contentUid.userSymlinkTo(dest);
             destInitial.rename(dest.backupIfExists());
@@ -692,8 +710,9 @@ public class JCrawler implements Callable<Integer> {
         if (config.migrate) {
           ReferenceLocation metaJson3 = dest.meta("", ".meta.json");
           String metaContent = metaJson3.asReadableFile().readContent();
-          Metadata meta = metaContent.isEmpty() ? new Metadata() : Nodes.json.toObject(metaContent, Metadata.class);
-          WritableFileLocation destRecomputed = config.cached(SlugEscape.contentPathFinal(href.externalForm, meta))
+          Metadata meta = metaContent.isEmpty() ? Metadata.empty(href.externalForm)
+              : Nodes.json.toObject(metaContent, Metadata.class);
+          WritableFileLocation destRecomputed = config.cached(Slug.contentPathFinal(href.externalForm, meta))
             .asWritableFile();
           var metaJson3Recomputed = destRecomputed.meta("", ".meta.json").asWritableFile();
           if (!metaJson3.absoluteAndNormalized().equals(metaJson3Recomputed.absoluteAndNormalized())) {
@@ -709,7 +728,7 @@ public class JCrawler implements Callable<Integer> {
           dest = destRecomputed;
           metadata = meta;
         } else {
-          dest = config.cached(SlugEscape.contentPathFinal(href.externalForm, metadata)).asWritableFile();
+          dest = config.cached(Slug.contentPathFinal(href.externalForm, metadata)).asWritableFile();
         }
       }
 
@@ -720,7 +739,7 @@ public class JCrawler implements Callable<Integer> {
           links = API.Seq();
         } else
           try {
-            links = extractLinksInMemory(dest, metadata);
+            links = extractLinksInMemory(href, dest, metadata);
           } catch (Exception e) {
             log.info("mark failing link extraction[{}]: {}", hostname, Throwables.getRootCause(e).getMessage(), e);
             links = API.Seq();
@@ -731,7 +750,7 @@ public class JCrawler implements Callable<Integer> {
           ReferenceLocation metaJson3 = dest.meta("", ".meta.json");
           String metaContent = metaJson3.asReadableFile().readContent();
           Metadata meta = metaContent.isEmpty() ? new Metadata() : Nodes.json.toObject(metaContent, Metadata.class);
-          links = extractLinksInMemory(dest, meta);
+          links = extractLinksInMemory(href, dest, meta);
         } finally {
           log.debug("download from cache done [{}]", href.externalForm);
         }
@@ -764,23 +783,45 @@ public class JCrawler implements Callable<Integer> {
       //        return io.vavr.collection.Iterator.empty();
       //      }
     }
-
-    public RequestResponse download(String url) {
-      //return downloadAndExtractLinks(url);
-      throw new RuntimeException("Not implemented yet!!!");
-    }
+    //
+    //    public RequestResponse download(String url) {
+    //      //return downloadAndExtractLinks(url);
+    //      throw new RuntimeException("Not implemented yet!!!");
+    //    }
 
     public RequestResponse download(String url, WritableFileLocation dest) {
       HttpClient client2 = HttpClient.newHttpClient();
-      HttpRequest request = HttpRequest.newBuilder(URI.create(url))
+      Builder reqBuilder = HttpRequest.newBuilder(URI.create(url));
+      //GET /corp/xweb/xweb.asp?NTKN=c&page=jobmatches&txtJobId=J1024-0659&clid=21001&jid=1419639 HTTP/1.1
+      java.util.List<String> headers = headers(
+        """
+              Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+              Accept-Encoding: gzip, deflate, br, zstd, identity
+              Accept-Language: en-US,en;q=0.9,ro;q=0.8,hu;q=0.7
+              Referer: https://cgi.njoyn.com/
+              Upgrade-Insecure-Requests: 1
+              User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36
+              Cache-Control: no-cache
+              Pragma: no-cache
+              Sec-Fetch-Dest: document
+              Sec-Fetch-Mode: navigate
+              Sec-Fetch-Site: none
+              Sec-Fetch-User: ?1
+              sec-ch-ua: "Chromium";v="130", "Google Chrome";v="130", "Not?A_Brand";v="99"
+              sec-ch-ua-mobile: ?0
+              sec-ch-ua-platform: "Windows"
+            """,
+        "Cookie", "Referer", "Connection", "Host");
+      reqBuilder.headers(headers.toArray(new String[0]));
+      HttpRequest request = reqBuilder
         .build();
       try {
         HttpResponse<Path> response = client2.send(request,
           HttpResponse.BodyHandlers.ofFile(dest.asPathLocation().toPath()));
         // Access request and response details
-        HttpRequest sentRequest = response.request();
+        //        HttpRequest sentRequest = response.request();
         int statusCode = response.statusCode();
-        log.debug("downloading {} to {}", url, dest.toExternalForm());
+        log.debug("downloading #{}: {} to {}", statusCode, url, dest.toExternalForm());
         //return client.get(url).copyTo(dest);
         return new RequestResponse(client.get(url), response);
       } catch (IOException | InterruptedException e) {
@@ -788,10 +829,48 @@ public class JCrawler implements Callable<Integer> {
       }
     }
 
+    public static java.util.List<String> headers(String headers, String... excludes) {
+      java.util.Set<String> excludeSet = java.util.Set.of(excludes);
+      java.util.List<String> headerList = new ArrayList<>();
+
+      // Split headers into individual lines
+      Iterable<String> lines = Splitter.on("\n").omitEmptyStrings().trimResults().split(headers);
+      for (String line : lines) {
+        // Split the line by the first occurrence of ":" to separate key and value
+        int colonIndex = line.indexOf(":");
+        if (colonIndex == -1) {
+          continue; // Invalid line, skip
+        }
+
+        String key = line.substring(0, colonIndex).trim();
+        String value = line.substring(colonIndex + 1).trim();
+
+        // Skip excluded headers
+        if (excludeSet.contains(key)) {
+          continue;
+        }
+
+        // Handle splitting by commas only for headers that do not require a single value
+        if (key.equalsIgnoreCase("User-Agent") || key.equalsIgnoreCase("Referer") || key.equalsIgnoreCase("Cookie")) {
+          headerList.add(key);
+          headerList.add(value);
+        } else {
+          // Use Guava's Splitter to split values on commas and add each as a separate key-value pair
+          Iterable<String> values = Splitter.on(",").omitEmptyStrings().trimResults().split(value);
+          for (String v : values) {
+            headerList.add(key);
+            headerList.add(v);
+          }
+        }
+      }
+
+      return headerList;
+    }
+
     //val notParsedUrls = Seq("javascript", "tel")
     //Extract links from content taking into consideration the base url but also the possible <base> tag attribute.
     //<base href="http://www.cartierbratieni.ro/" />
-    private Traversable<HyperLink> extractLinksInMemory(WritableFileLocation source,
+    private Traversable<HyperLink> extractLinksInMemory(HyperLink parent, WritableFileLocation source,
         Metadata meta) {
       if (meta.responseHeaders == null) {
         return API.Seq();
@@ -828,7 +907,7 @@ public class JCrawler implements Callable<Integer> {
       String sourceUrl = meta.url;
       //String sourceUrl = meta2.httpMetaRequestUri().get();
       io.vavr.collection.Iterator<HyperLink> result = isHtmlAnd200
-          ? extractLinksFromContent(content, source.toExternalForm(), sourceUrl)
+          ? extractLinksFromContent(parent.depth + 1, content, source.toExternalForm(), sourceUrl)
           : io.vavr.collection.Iterator.empty();
       List<HyperLink> all = result.toList();
       int status = meta.statusCodeValue;
@@ -837,7 +916,8 @@ public class JCrawler implements Callable<Integer> {
         String url = meta.responseHeaders.getLocation().toString();
         all = all
           .append(
-            HyperLink.of(url, "Moved - http status " + status, null, "", sourceUrl, source.toExternalForm()));
+            HyperLink.of(url, parent.depth + 1, "Moved - http status " + status, null, "", sourceUrl,
+              source.toExternalForm()));
       }
       //      YAMLMapper mapper = Nodes.yml.mapper();
       //      mapper.configure(YAMLGenerator.Feature.LITERAL_BLOCK_STYLE, true);

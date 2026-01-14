@@ -1,7 +1,5 @@
 package org.raisercostin.jcrawler;
 
-import java.util.function.Supplier;
-
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
@@ -9,13 +7,7 @@ import lombok.NoArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.ToString;
 import lombok.experimental.FieldDefaults;
-import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
-import org.jedio.struct.RichIterable;
-import org.raisercostin.jedio.FileLocation;
-import org.raisercostin.jedio.RelativeLocation;
-import org.raisercostin.jedio.SlugEscape;
-import org.raisercostin.jedio.SlugEscape.Slug;
 import org.raisercostin.jedio.url.SimpleUrl;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE, force = true)
@@ -25,24 +17,25 @@ import org.raisercostin.jedio.url.SimpleUrl;
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class HyperLink {
   public static HyperLink of(String url) {
-    return new HyperLink(url, toLocalCache(url), "original", "", null, null, null, null);
+    return new HyperLink(url, 0, toLocalCache(url), "original", "", null, null, null, null);
   }
 
-  public static HyperLink of(String relativeOrAbsoluteHyperlink, String text,
+  public static HyperLink of(String relativeOrAbsoluteHyperlink, int depth, String text,
       String anchor, String all, String sourceHyperlink, String sourceLocalCache) {
     String url = SimpleUrl.resolve(sourceHyperlink, relativeOrAbsoluteHyperlink);
     //WebClientLocation link = Locations.url(sourceHyperlink, relativeOrAbsoluteHyperlink);
     //TODO link should not contain #fragments since link is used for uniqueness
-    return new HyperLink(url, toLocalCache(url), relativeOrAbsoluteHyperlink, text, anchor, all, sourceHyperlink,
+    return new HyperLink(url, depth, toLocalCache(url), relativeOrAbsoluteHyperlink, text, anchor, all, sourceHyperlink,
       sourceLocalCache);
   }
 
   private static Slug toLocalCache(String url) {
-    return SlugEscape.slugs(url).head();
+    return Slug.slugs(url).head();
   }
 
   @EqualsAndHashCode.Include
   String externalForm;
+  int depth;
   Slug localCache;
   String relativeOrAbsoluteHyperlink;
   @ToString.Exclude
