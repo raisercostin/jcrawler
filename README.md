@@ -14,7 +14,7 @@ scoop install https://github.com/raisercostin/jcrawler/raw/master/jcrawler.json
 jcrawl
 
 Usage: jcrawl [-hV] [--debug] [--accept=<accept>] [--acceptHostname=<acceptHostname>] [-c=<maxConnections>]
-              [-d=<maxDocs>] [--expire=<cacheExpiryDuration>] [-p=<projectDir>] [-t=<traversalType>] [-v=<verbosity>]
+              [-d=<maxDocs>] [--expire=<cacheExpiryDuration>] [-p=<projectDir>] [-t=<traversalType>] [-v]...
               [--protocol=<protocols>]... urls
 Crawler tool.
       urls                  Urls to crawl. If urls contain expressions all combinations of that values will be
@@ -54,9 +54,7 @@ Crawler tool.
                             Set the traversal mode: PARALLEL_BREADTH_FIRST, BREADTH_FIRST, DEPTH_FIRST_PREORDER,
                               DEPTH_FIRST_POSTORDER.
                               Default: PARALLEL_BREADTH_FIRST
-  -v, --verbosity=<verbosity>
-                            Set the verbosity level: NONE, ERROR, WARN, INFO, DEBUG, TRACE.
-                              Default: WARN
+  -v, --verbose             Increase verbosity. Use multiple (-vvv)
   -V, --version             Print version information and exit.
 ```
 

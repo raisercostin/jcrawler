@@ -11,7 +11,6 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.raisercostin.jcrawler.JCrawler.TraversalType;
-import org.raisercostin.jcrawler.JCrawler.Verbosity;
 import org.raisercostin.jedio.Locations;
 import org.raisercostin.jedio.Metadata;
 import org.raisercostin.jedio.path.PathLocation;
@@ -146,7 +145,7 @@ class JCrawlerTest {
       .withProjectPath(".jcrawler/whoiswho")
       .withUrl("https://op.europa.eu/en/web/who-is-who/archive")
       .withTraversalType(TraversalType.BREADTH_FIRST)
-      .withVerbosity(Verbosity.DEBUG);
+      .withVerbosity(3);
     crawler.crawlIterator().take(10).forEach(x -> System.out.println("loaded " + x));
 
     //wget https://op.europa.eu/en/web/who-is-who/archive
@@ -157,7 +156,7 @@ class JCrawlerTest {
     PathLocation dest = Locations.tempFile("jcrawl-", null);
     String url = "https://op.europa.eu/documents/d/who-is-who/pdf_archive_eu_whoiswho_202407-en";
     Metadata metadata = JCrawler.crawler()
-      .withVerbosity(Verbosity.DEBUG)
+      .withVerbosity(3)
       .worker()
       .download(url, dest)
       .getMetadata();
@@ -175,7 +174,7 @@ class JCrawlerTest {
     String url = "https://en.m.wikipedia.org/wiki/Wget?param=value";
     String urlWithFragments = url + "#Wget2";
     Metadata metadata = JCrawler.crawler()
-      .withVerbosity(Verbosity.DEBUG)
+      .withVerbosity(3)
       .worker()
       .download(urlWithFragments, dest)
       .getMetadata();
@@ -197,7 +196,7 @@ class JCrawlerTest {
     String url = "https://upload.wikimedia.org/wikipedia/commons/f/f7/Gwget-1.0.4.png";
     String urlWithFragments = url + "#Wget2";
     Metadata metadata = JCrawler.crawler()
-      .withVerbosity(Verbosity.DEBUG)
+      .withVerbosity(3)
       .worker()
       .download(urlWithFragments, dest)
       .getMetadata();
@@ -232,7 +231,7 @@ class JCrawlerTest {
       )
       .withTraversalType(TraversalType.BREADTH_FIRST)
       .withRecomputeLinks(true)
-      .withVerbosity(Verbosity.DEBUG);
+      .withVerbosity(3);
     RichIterable<HyperLink> all = crawler.crawlIterator()
       .take(10000)
       .doOnNext(x -> System.out.println("loaded " + x))
@@ -342,7 +341,7 @@ class JCrawlerTest {
       )
       .withTraversalType(TraversalType.BREADTH_FIRST)
       .withRecomputeLinks(true)
-      .withVerbosity(Verbosity.DEBUG)
+      .withVerbosity(3)
       //.withCacheExpiryDuration(null)
       .withDepth(1);
     RichIterable<HyperLink> all = crawler.crawlIterator()
@@ -373,7 +372,7 @@ class JCrawlerTest {
       .withUrl("https://cgi.njoyn.com/corp/xweb/xweb.asp?NTKN=c&page=joblisting&clid=21001")
       .withTraversalType(TraversalType.BREADTH_FIRST)
       //.withRecomputeLinks(true)
-      .withVerbosity(Verbosity.DEBUG);
+      .withVerbosity(3);
     RichIterable<HyperLink> all = crawler.crawlIterator()
       .take(1)
       .doOnNext(x -> System.out.println("loaded " + x))
@@ -399,7 +398,7 @@ class JCrawlerTest {
       .withProjectPath(".jcrawler/projects-mobility")
       .withUrl("https://www.projects-mobility.com/")
       .withTraversalType(TraversalType.PARALLEL_BREADTH_FIRST)
-      .withVerbosity(Verbosity.DEBUG)
+      .withVerbosity(3)
       .withMaxDocs(30);
 
     RichIterable<HyperLink> all = crawler.crawlIterator()

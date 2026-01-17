@@ -290,7 +290,7 @@ public class JCrawler implements Callable<Integer> {
 
   private static JCrawler of(DirLocation projectDir, Seq<String> urls) {
     JCrawler crawler = new JCrawler(new StandardOptions(), null, TraversalType.BREADTH_FIRST, Nodes.json, false, new PicocliDir(projectDir),
-      -1, 3, null, Duration.ofDays(100), null, null, Verbosity.INFO, 100, false, null, null, true)
+      -1, 3, null, Duration.ofDays(100), null, null, 100, false, null, null, true)
         .withUrlsAndAccept(urls);
     return crawler;
   }
@@ -441,26 +441,6 @@ public class JCrawler implements Callable<Integer> {
     abstract <N> Iterable<N> traverse(JCrawler config, Iterable<N> todo, SuccessorsFunction<N> successor);
   }
 
-  public enum Verbosity {
-    NONE(Level.OFF),
-    ERROR(Level.ERROR),
-    WARN(Level.WARN),
-    INFO(Level.INFO),
-    DEBUG(Level.DEBUG),
-    TRACE(Level.TRACE);
-
-    final Level level;
-
-    Verbosity(Level logbackLevel) {
-      this.level = logbackLevel;
-    }
-
-    public void configureLoggingLevel() {
-      LoggerContext context = (LoggerContext) LoggerFactory.getILoggerFactory();
-      context.getLogger("org.raisercostin.jcrawler").setLevel(level);
-    }
-  }
-
   @Spec
   @JsonIgnore
   private CommandSpec spec; // injected by picocli
@@ -503,9 +483,6 @@ public class JCrawler implements Callable<Integer> {
   public Seq<String> urls;
   @picocli.CommandLine.Option(names = { "--accept" }, description = "Additional urls to accept.")
   public Set<String> accept;
-  @picocli.CommandLine.Option(names = { "-V", "--verbosity" },
-      description = "Set the verbosity level: ${COMPLETION-CANDIDATES}. (Note: use -v for RichCli verbosity)")
-  public Verbosity verbosity = Verbosity.WARN;
   @picocli.CommandLine.Option(names = { "-l", "--level" },
       description = "Limit depth crawling. Given start urls are level 0. All different links from it are level 1.")
   public int depth = 100;
@@ -581,6 +558,11 @@ public class JCrawler implements Callable<Integer> {
     return withAccept(API.Set(filters));
   }
 
+  public JCrawler withVerbosity(int level) {
+    RichCli.setLoggingLevel("org.raisercostin.jcrawler", level);
+    return this;
+  }
+
   public JCrawler withProtocol(HttpProtocol... protocols) {
     return withProtocols(protocols);
   }
@@ -626,7 +608,7 @@ public class JCrawler implements Callable<Integer> {
     private Set<String> accept;
 
     public CrawlerWorker(JCrawler config) {
-      config.verbosity.configureLoggingLevel();
+      //config.verbosity.configureLoggingLevel();
       this.config = config;
       this.accept = config.urls != null ? config.urls.iterator()
         .map(
