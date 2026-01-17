@@ -23,6 +23,8 @@
 //DEPS org.apache.commons:commons-lang3:3.14.0
 //DEPS org.apache.commons:commons-text:1.11.0
 //DEPS commons-io:commons-io:2.15.1
+//DEPS org.brotli:dec:0.1.2
+//DEPS com.github.luben:zstd-jni:1.5.5-11
 
 // Lombok (compile-time + annotation processor) - 1.18.34+ required for Java 23
 //DEPS org.projectlombok:lombok:1.18.36
@@ -74,6 +76,9 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import org.brotli.dec.BrotliInputStream;
+import com.github.luben.zstd.ZstdInputStream;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.LoggerContext;
@@ -581,12 +586,41 @@ public class JCrawler implements Callable<Integer> {
     }
     // Check for both .html and .html.gz existence when checking modification time
     if (!dest.exists()) {
-        ReferenceLocation gzDest = dest.parentRef().get().child(dest.filename() + ".gz");
-        if (gzDest.exists()) {
-            return gzDest.modifiedDateTime().toInstant().isBefore(Instant.now().minus(cacheExpiryDuration));
+        for(String ext : io.vavr.collection.List.of(".gz", ".br", ".zst")) {
+            ReferenceLocation compressedDest = dest.parentRef().get().child(dest.filename() + ext);
+            if (compressedDest.exists()) {
+                return compressedDest.modifiedDateTime().toInstant().isBefore(Instant.now().minus(cacheExpiryDuration));
+            }
         }
     }
     return dest.modifiedDateTime().toInstant().isBefore(Instant.now().minus(cacheExpiryDuration));
+  }
+
+  public static InputStream decompressStream(String encoding, InputStream in) throws IOException {
+      if ("gzip".equalsIgnoreCase(encoding)) {
+          return new java.util.zip.GZIPInputStream(in);
+      } else if ("deflate".equalsIgnoreCase(encoding)) {
+          return new java.util.zip.InflaterInputStream(in);
+      } else if ("br".equalsIgnoreCase(encoding)) {
+          return new BrotliInputStream(in);
+      } else if ("zstd".equalsIgnoreCase(encoding)) {
+          return new ZstdInputStream(in);
+      }
+      return in;
+  }
+
+  public static String getExtensionForEncoding(String encoding) {
+      if ("gzip".equalsIgnoreCase(encoding)) return ".gz";
+      if ("br".equalsIgnoreCase(encoding)) return ".br";
+      if ("zstd".equalsIgnoreCase(encoding)) return ".zst";
+      return "";
+  }
+
+  public static String getEncodingFromExtension(String ext) {
+      if (".gz".equalsIgnoreCase(ext)) return "gzip";
+      if (".br".equalsIgnoreCase(ext)) return "br";
+      if (".zst".equalsIgnoreCase(ext)) return "zstd";
+      return "";
   }
 
   public JCrawler withProjectPath(PathLocation dir) {
@@ -713,58 +747,65 @@ public class JCrawler implements Callable<Integer> {
       var destFromSymlink = contentUid.existingRef().map(x -> x.userSymlinkTarget());
       var metaJson2 = destFromSymlink.map(x -> x.meta("", ".meta.json"));
       
-      // Check for existence considering compressed variant too
-      boolean destExists = destFromSymlink.map(x -> x.exists() || x.parentRef().get().child(x.filename() + ".gz").exists()).getOrElse(false);
-      boolean exists = contentUid.exists() && /* contentUid.isSymlink() && */ destExists
-          && metaJson2.get().exists();
-      //      WritableFileLocation old = config.findOldFile(href);
-      //      WritableFileLocation dest = config.cached(href).asWritableFile();
-      //      //      try {
-      //      if (old.exists()) {
-      //        old.rename(dest);
-      //        old.meta("", ".meta.json").asPathLocation().rename(dest.meta("", ".meta.json").asPathLocation());
-      //        old.meta("", ".links.json").asPathLocation().rename(dest.meta("", ".links.json").asPathLocation());
-      //      }
-      boolean forcedDownload = exists && config.forceDownload(href, contentUid.asWritableFile());
-      if (!exists || forcedDownload) {
-        String token = tokenQueue.take();
-        //semaphore.acquire();
-        //int available = counter.incrementAndGet();
-        try {
-          //check writing before downloading
-          destInitial.write("").deleteFile(DeleteOptions.deletePermanent());
-          log.debug("download from url #{} [{}]", token, href.externalForm);
-          try {
-            String url = href.externalForm;
-            RequestResponse content = download(url, destInitial);
-            metadata = content.getMetadata();
-            metadata.addField("crawler.slug", href.slug());
-            dest = config.cached(Slug.contentPathFinal(href.externalForm, metadata)).asWritableFile();
-            contentUid.asPathLocation().deleteFile(DeleteOptions.deleteByRenameOption().withIgnoreNonExisting(true));
-            // Adjust userSymlinkTo to point to the canonical file name (without .gz), even if physical file is .gz?
-            // Symlink usually points to existing file.
-            // If we only store compressed, dest (without .gz) doesn't exist.
-            // So we might need to point to dest + ".gz" if that's what we kept.
-            
-            WritableFileLocation finalDest = dest;
-            if (config.contentStorage == ContentStorage.compressed && !dest.exists()) {
-                 WritableFileLocation gzDest = dest.parentRef().get().child(dest.filename() + ".gz").asWritableFile();
-                 if (gzDest.exists()) {
-                     finalDest = gzDest;
-                 }
-            }
-            
-            contentUid.userSymlinkTo(finalDest);
-            // Rename logic needs to handle .gz
+            // Check for existence considering compressed variant too
+            boolean destExists = destFromSymlink.map(x -> x.exists() || 
+                io.vavr.collection.List.of(".gz", ".br", ".zst")
+                    .exists(ext -> x.parentRef().get().child(x.filename() + ext).exists())
+            ).getOrElse(false);
+            boolean exists = contentUid.exists() && /* contentUid.isSymlink() && */ destExists
+                && metaJson2.get().exists();
+            //      WritableFileLocation old = config.findOldFile(href);
+            //      WritableFileLocation dest = config.cached(href).asWritableFile();
+            //      //      try {
+            //      if (old.exists()) {
+            //        old.rename(dest);
+            //        old.meta("", ".meta.json").asPathLocation().rename(dest.meta("", ".meta.json").asPathLocation());
+            //        old.meta("", ".links.json").asPathLocation().rename(dest.meta("", ".links.json").asPathLocation());
+            //      }
+            boolean forcedDownload = exists && config.forceDownload(href, contentUid.asWritableFile());
+            if (!exists || forcedDownload) {
+              String token = tokenQueue.take();
+              //semaphore.acquire();
+              //int available = counter.incrementAndGet();
+              try {
+                //check writing before downloading
+                destInitial.write("").deleteFile(DeleteOptions.deletePermanent());
+                log.debug("download from url #{} [{}]", token, href.externalForm);
+                try {
+                  String url = href.externalForm;
+                  RequestResponse content = download(url, destInitial);
+                  metadata = content.getMetadata();
+                  metadata.addField("crawler.slug", href.slug());
+                  dest = config.cached(Slug.contentPathFinal(href.externalForm, metadata)).asWritableFile();
+                  contentUid.asPathLocation().deleteFile(DeleteOptions.deleteByRenameOption().withIgnoreNonExisting(true));
+                  // Adjust userSymlinkTo to point to the canonical file name (without .gz), even if physical file is .gz?
+                  // Symlink usually points to existing file.
+                  // If we only store compressed, dest (without .gz) doesn't exist.
+                  // So we might need to point to dest + ".gz" if that's what we kept.
+      
+                  WritableFileLocation finalDest = dest;
+                  if (config.contentStorage == ContentStorage.compressed && !dest.exists()) {
+                       for(String ext : io.vavr.collection.List.of(".gz", ".br", ".zst")) {
+                           WritableFileLocation compDest = dest.parentRef().get().child(dest.filename() + ext).asWritableFile();
+                           if (compDest.exists()) {
+                               finalDest = compDest;
+                               break;
+                           }
+                       }
+                  }
+      
+                  contentUid.userSymlinkTo(finalDest);            // Rename logic needs to handle .gz, .br, .zst
             if (destInitial.exists()) {
                 destInitial.rename(dest.backupIfExists());
             } 
             
-            // Check if .gz exists (for both or compressed mode)
-            ReferenceLocation gzInitial = destInitial.parentRef().get().child(destInitial.filename() + ".gz");
-            if (gzInitial.exists()) {
-                ReferenceLocation gzDest = dest.parentRef().get().child(dest.filename() + ".gz");
-                gzInitial.asWritableFile().rename(gzDest.asWritableFile().backupIfExists());
+            // Check if compressed variant exists (for both or compressed mode)
+            for(String ext : io.vavr.collection.List.of(".gz", ".br", ".zst")) {
+                ReferenceLocation compInitial = destInitial.parentRef().get().child(destInitial.filename() + ext);
+                if (compInitial.exists()) {
+                    ReferenceLocation compDest = dest.parentRef().get().child(dest.filename() + ext);
+                    compInitial.asWritableFile().rename(compDest.asWritableFile().backupIfExists());
+                }
             }
             
             ReferenceLocation metaJson = dest.meta("", ".meta.json");
@@ -817,23 +858,27 @@ public class JCrawler implements Callable<Integer> {
               .rename(metaJson3Recomputed.mkdirOnParentIfNeeded().toPathLocation().backupIfExists());
           }
           if (!dest.absoluteAndNormalized().equals(destRecomputed.absoluteAndNormalized())) {
-             // Handle potential .gz rename
+             // Handle potential compressed rename
              if (dest.exists()) {
                  dest.rename(destRecomputed.mkdirOnParentIfNeeded().toPathLocation().backupIfExists());
-             } else {
-                 ReferenceLocation gzSrc = dest.parentRef().get().child(dest.filename() + ".gz");
-                 if (gzSrc.exists()) {
-                     ReferenceLocation gzDst = destRecomputed.parentRef().get().child(destRecomputed.filename() + ".gz");
-                     gzSrc.asWritableFile().rename(gzDst.asWritableFile().backupIfExists());
+             }
+             for(String ext : io.vavr.collection.List.of(".gz", ".br", ".zst")) {
+                 ReferenceLocation compSrc = dest.parentRef().get().child(dest.filename() + ext);
+                 if (compSrc.exists()) {
+                     ReferenceLocation compDst = destRecomputed.parentRef().get().child(destRecomputed.filename() + ext);
+                     compSrc.asWritableFile().rename(compDst.asWritableFile().backupIfExists());
                  }
              }
           }
           
           WritableFileLocation finalDest = destRecomputed;
           if (config.contentStorage == ContentStorage.compressed && !destRecomputed.exists()) {
-               WritableFileLocation gzDest = destRecomputed.parentRef().get().child(destRecomputed.filename() + ".gz").asWritableFile();
-               if (gzDest.exists()) {
-                   finalDest = gzDest;
+               for(String ext : io.vavr.collection.List.of(".gz", ".br", ".zst")) {
+                   WritableFileLocation compDest = destRecomputed.parentRef().get().child(destRecomputed.filename() + ext).asWritableFile();
+                   if (compDest.exists()) {
+                       finalDest = compDest;
+                       break;
+                   }
                }
           }
           contentUid.userSymlinkTo(finalDest);
@@ -910,7 +955,7 @@ public class JCrawler implements Callable<Integer> {
       java.util.List<String> headers = headers(
         """
               Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
-              Accept-Encoding: gzip, deflate, identity
+              Accept-Encoding: gzip, deflate, br, zstd, identity
               Accept-Language: en-US,en;q=0.9,ro;q=0.8,hu;q=0.7
               Referer: https://cgi.njoyn.com/
               Upgrade-Insecure-Requests: 1
@@ -930,30 +975,30 @@ public class JCrawler implements Callable<Integer> {
       HttpRequest request = reqBuilder
         .build();
       try {
-        HttpResponse<Path> response = client2.send(request,
-          HttpResponse.BodyHandlers.ofFile(dest.asPathLocation().toPath()));
+                HttpResponse<Path> response = client2.send(request,
+                  HttpResponse.BodyHandlers.ofFile(dest.asPathLocation().toPath()));
+                
+                String encoding = response.headers().firstValue("Content-Encoding").orElse("");
+                String extension = getExtensionForEncoding(encoding);
+                if (!extension.isEmpty()) {
+                   Path path = dest.asPathLocation().toPath();
+                   Path tempPath = path.resolveSibling(path.getFileName() + extension);
+                   // Move original to .<ext>
+                   java.nio.file.Files.move(path, tempPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
         
-        String encoding = response.headers().firstValue("Content-Encoding").orElse("");
-        if ("gzip".equalsIgnoreCase(encoding)) {
-           Path path = dest.asPathLocation().toPath();
-           Path tempPath = path.resolveSibling(path.getFileName() + ".gz");
-           // Move original to .gz
-           java.nio.file.Files.move(path, tempPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-           
-           if (config.contentStorage == ContentStorage.decompressed || config.contentStorage == ContentStorage.both) {
-               try (InputStream raw = java.nio.file.Files.newInputStream(tempPath);
-                    InputStream is = new java.util.zip.GZIPInputStream(raw);
-                    java.io.OutputStream fos = java.nio.file.Files.newOutputStream(path)) {
-                    is.transferTo(fos);
-               }
-           }
-           if (config.contentStorage == ContentStorage.decompressed) {
-               java.nio.file.Files.delete(tempPath);
-           }
-        }
-
-        // Access request and response details
-        //        HttpRequest sentRequest = response.request();
+                   if (config.contentStorage == ContentStorage.decompressed || config.contentStorage == ContentStorage.both) {
+                       try (InputStream raw = java.nio.file.Files.newInputStream(tempPath);
+                            InputStream is = decompressStream(encoding, raw);
+                            java.io.OutputStream fos = java.nio.file.Files.newOutputStream(path)) {
+                            is.transferTo(fos);
+                       }
+                   }
+                   if (config.contentStorage == ContentStorage.decompressed) {
+                       java.nio.file.Files.delete(tempPath);
+                   }
+                }
+        
+                // Access request and response details        //        HttpRequest sentRequest = response.request();
         int statusCode = response.statusCode();
         log.debug("downloading #{}: {} to {}", statusCode, url, dest.toExternalForm());
         //return client.get(url).copyTo(dest);
@@ -1031,17 +1076,19 @@ public class JCrawler implements Callable<Integer> {
           log.trace("Ignoring links cache from {} and read links again for a parsing error.", metaLinks, e);
         }
       }
-      String content;
+      String content = "";
       if (source.exists()) {
           content = source.asReadableFile().readContent();
       } else {
-          ReferenceLocation gzSource = source.parentRef().get().child(source.filename() + ".gz");
-          if (gzSource.exists()) {
-              try (InputStream is = new java.util.zip.GZIPInputStream(gzSource.asReadableFile().unsafeInputStream())) {
-                  content = new String(is.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+          for(String ext : io.vavr.collection.List.of(".gz", ".br", ".zst")) {
+              ReferenceLocation compressedSource = source.parentRef().get().child(source.filename() + ext);
+              if (compressedSource.exists()) {
+                  String encoding = getEncodingFromExtension(ext);
+                  try (InputStream is = decompressStream(encoding, compressedSource.asReadableFile().unsafeInputStream())) {
+                      content = new String(is.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+                  }
+                  break;
               }
-          } else {
-              content = "";
           }
       }
       //Option<String> contentType = meta.responseHeaders.getContentType()==MediaType.TEXT_HTML;

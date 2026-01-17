@@ -74,3 +74,18 @@
 ### Meta
 - **Good**: Identified and resolved hidden dependency conflicts causing test failures.
 - **Bad**: Test execution revealed unrelated failures (`AnreSpotTest`) which were left for the user as requested.
+
+## 2026-01-17: Brotli and Zstd Support
+**Agent:** Gemini CLI | **Role:** Implementer | **Goal:** Add support for Brotli and Zstandard compression algorithms.
+
+### Key Changes
+| Area | Type | Description |
+|------|------|-------------|
+| Crawler | feat | Added support for `br` (Brotli) and `zstd` (Zstandard) content encoding. |
+| Crawler | feat | Updated `Accept-Encoding` header to advertise `gzip, deflate, br, zstd`. |
+| Crawler | fix | Refactored decompression logic to handle `.gz`, `.br`, and `.zst` extensions dynamically for both storage and reading. |
+| Build | deps | Added `org.brotli:dec` and `com.github.luben:zstd-jni` dependencies. |
+
+### Meta
+- **Good**: Leveraged the existing decompression framework to easily add new formats.
+- **Note**: Requires native libraries via JNI for Zstd, which `zstd-jni` handles automatically.

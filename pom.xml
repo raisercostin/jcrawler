@@ -130,6 +130,16 @@
       <artifactId>guava</artifactId>
       <version>33.1.0-jre</version>
     </dependency>
+    <dependency>
+      <groupId>org.brotli</groupId>
+      <artifactId>dec</artifactId>
+      <version>0.1.2</version>
+    </dependency>
+    <dependency>
+      <groupId>com.github.luben</groupId>
+      <artifactId>zstd-jni</artifactId>
+      <version>1.5.5-11</version>
+    </dependency>
     <!-- testing -->
     <dependency>
       <groupId>org.junit.jupiter</groupId>
