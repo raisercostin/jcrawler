@@ -861,9 +861,16 @@ public class JCrawler implements Callable<Integer> {
               destInitial.deleteFile(DeleteOptions.deleteByRenameOption().withIgnoreNonExisting(true));
               return API.Seq();
             }
-            // IllegalArgumentException typically means bad URL format (e.g., template variables like ${i.uri})
+            // IllegalArgumentException from RequestResponse validation means bad URL/response
+            // (e.g., template variables like ${i.uri}, null status code, etc.)
             if (rootCause instanceof IllegalArgumentException) {
-              log.debug("skipping malformed URL [{}]: {}", href.externalForm, rootMessage);
+              String location = e.getStackTrace().length > 0 ? e.getStackTrace()[0].getClassName() : "";
+              boolean isWebClientValidation = location.contains("WebClientLocation") || location.contains("RequestResponse");
+              log.info("skipping invalid URL/response [{}]: {} ({}{})",
+                href.externalForm,
+                rootMessage != null ? rootMessage : "validation failed",
+                rootCause.getClass().getSimpleName(),
+                isWebClientValidation ? " from WebClient validation" : "");
               destInitial.deleteFile(DeleteOptions.deleteByRenameOption().withIgnoreNonExisting(true));
               return API.Seq();
             }
