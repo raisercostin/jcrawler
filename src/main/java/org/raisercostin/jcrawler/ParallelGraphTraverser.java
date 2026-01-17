@@ -24,6 +24,8 @@ public class ParallelGraphTraverser<N> {
   private BlockingQueue<N> visitedOrder; // To maintain the order of visited nodes
   private ExecutorService executor;
   private int numberOfWorkerThreads;
+  private AtomicInteger idleWorkers; // Track idle workers waiting on empty queue
+  private volatile boolean terminated = false;
 
   public ParallelGraphTraverser(int numberOfWorkerThreads, SuccessorsFunction<N> successorFunction) {
     this.numberOfWorkerThreads = numberOfWorkerThreads;
@@ -33,6 +35,7 @@ public class ParallelGraphTraverser<N> {
     this.horizon = new LinkedBlockingQueue<>();
     this.visitedOrder = new LinkedBlockingQueue<>(); // Queue to track order of visited nodes
     this.executor = Executors.newFixedThreadPool(numberOfWorkerThreads);
+    this.idleWorkers = new AtomicInteger(0);
   }
 
   private static class SentinelKillPill {
@@ -50,8 +53,28 @@ public class ParallelGraphTraverser<N> {
       int locali = i;
       executor.submit(() -> {
         try {
-          while (!Thread.currentThread().isInterrupted()) {
-            N current = horizon.take();
+          while (!Thread.currentThread().isInterrupted() && !terminated) {
+            // Use poll with timeout to allow checking for termination condition
+            int idle = idleWorkers.incrementAndGet();
+            N current = horizon.poll(500, TimeUnit.MILLISECONDS);
+
+            if (current == null) {
+              // Queue was empty - check if all workers are idle and queue is still empty
+              // Check BEFORE decrementing so we can detect all workers waiting
+              log.debug("Worker {} poll timeout: idle={}/{} horizon={} horizonSet={}",
+                locali, idle, numberOfWorkerThreads, horizon.size(), horizonSet.size());
+              if (horizon.isEmpty() && horizonSet.isEmpty() && idle >= numberOfWorkerThreads) {
+                // All workers idle and no more work - terminate
+                log.info("Worker {} detected termination condition: queue empty, idle={}/{}", locali, idle, numberOfWorkerThreads);
+                idleWorkers.decrementAndGet();
+                terminateAll();
+                break;
+              }
+              idleWorkers.decrementAndGet();
+              continue; // Try again
+            }
+            idleWorkers.decrementAndGet();
+
             if (current == STOP) {
               break; // Stop the thread
             }
@@ -59,9 +82,16 @@ public class ParallelGraphTraverser<N> {
             if (maxDocs <= 0 || visited.size() < maxDocs) {
               //process current node
               if (visited.add(current)) {
-                log.debug("Worker {} visited={} consumed={} maxDocs={}", locali, visited.size(),
+                log.info("Worker {} processing item, visited={} consumed={} maxDocs={}", locali, visited.size(),
                   visitedCounter.get(), maxDocs);
-                Iterable<? extends N> successors = successorFunction.successors(current);
+                Iterable<? extends N> successors = null;
+                try {
+                  successors = successorFunction.successors(current);
+                  log.info("Worker {} got {} successors", locali, successors != null ? "some" : "null");
+                } catch (Exception e) {
+                  log.error("Worker {} exception getting successors: {}", locali, e.getMessage(), e);
+                  successors = null;
+                }
                 if (successors != null) {
                   for (N successor : successors) {
                     if (!visited.contains(successor)) {
@@ -72,15 +102,21 @@ public class ParallelGraphTraverser<N> {
                     }
                   }
                 }
+                log.info("Worker {} adding to visitedOrder", locali);
                 visitedOrder.add(current); // Add to order queue when visited
+                log.info("Worker {} added to visitedOrder, incrementing counter", locali);
                 if (maxDocs > 0 && visitedCounter.incrementAndGet() >= maxDocs) {
                   stopVisited();
                 }
                 if (maxDocs > 0 && visited.size() >= maxDocs) {
-                  stopWorkers();
+                  terminateAll();
                   break;
                 }
+              } else {
+                log.info("Worker {} skipped item (already visited)", locali);
               }
+            } else {
+              log.info("Worker {} skipped item (maxDocs reached)", locali);
             }
           }
           if (maxDocs > 0 && visitedOrder.size() >= maxDocs) {
@@ -95,6 +131,16 @@ public class ParallelGraphTraverser<N> {
       });
     }
     return topDown();
+  }
+
+  private synchronized void terminateAll() {
+    if (terminated) return;
+    terminated = true;
+    log.info("Terminating all workers and shutting down executor");
+    stopWorkers();
+    stopVisited();
+    // Shutdown executor to allow JVM to exit
+    executor.shutdown();
   }
 
   private void stopWorkers() {
@@ -119,13 +165,35 @@ public class ParallelGraphTraverser<N> {
     return () -> new Iterator<>()
       {
         private N nextItem = null;
+        private boolean receivedStop = false;  // Track if we've received STOP
 
         @Override
         public boolean hasNext() {
+          if (receivedStop) {
+            return false;  // Already ended, don't poll again
+          }
           if (nextItem == null) {
             try {
-              nextItem = visitedOrder.take(); // Blocks if no visited nodes are available
-              if (nextItem == STOP) {
+              log.info("Iterator waiting for next item... visitedOrder.size={} terminated={}", visitedOrder.size(), terminated);
+              // Use poll with timeout instead of take to avoid infinite blocking
+              while (!terminated && !receivedStop) {
+                nextItem = visitedOrder.poll(500, TimeUnit.MILLISECONDS);
+                if (nextItem != null) {
+                  if (nextItem == STOP) {
+                    log.info("Iterator received STOP sentinel");
+                    receivedStop = true;
+                    nextItem = null;
+                    return false;
+                  }
+                  log.info("Iterator got item: {}", nextItem);
+                  break;
+                }
+                log.info("Iterator poll timeout, checking termination... terminated={}", terminated);
+              }
+              // If terminated flag is set, end iteration
+              if (terminated) {
+                log.info("Iterator ending due to terminated flag");
+                receivedStop = true;
                 nextItem = null;
               }
             } catch (InterruptedException e) {

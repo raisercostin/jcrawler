@@ -1,3 +1,58 @@
+///usr/bin/env jbang "$0" "$@" ; exit $?
+//JAVA 17+
+//COMPILE_OPTIONS -parameters
+//RUNTIME_OPTIONS -Dfile.encoding=UTF-8
+
+// Core dependencies
+//DEPS info.picocli:picocli:4.7.5
+//DEPS org.slf4j:slf4j-api:2.0.9
+//DEPS ch.qos.logback:logback-classic:1.4.11
+//DEPS ch.qos.logback:logback-core:1.4.11
+
+// Jackson
+//DEPS com.fasterxml.jackson.core:jackson-databind:2.15.3
+//DEPS com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.15.3
+
+// Vavr
+//DEPS io.vavr:vavr:0.10.4
+
+// Guava
+//DEPS com.google.guava:guava:33.1.0-jre
+
+// Apache Commons
+//DEPS org.apache.commons:commons-lang3:3.14.0
+//DEPS org.apache.commons:commons-text:1.11.0
+//DEPS commons-io:commons-io:2.15.1
+
+// Lombok (compile-time + annotation processor) - 1.18.34+ required for Java 23
+//DEPS org.projectlombok:lombok:1.18.36
+//JAVAC_OPTIONS -processor lombok.launch.AnnotationProcessorHider$AnnotationProcessor
+
+// JSoup
+//DEPS org.jsoup:jsoup:1.17.2
+
+// Spring Core
+//DEPS org.springframework:spring-core:6.1.3
+
+// Reactor Netty
+//DEPS io.projectreactor.netty:reactor-netty-http:1.1.15
+
+// Repositories (order matters - Maven Central first, then custom repos)
+//REPOS mavencentral
+//REPOS raisercostin=https://raw.githubusercontent.com/raisercostin/maven-repo/master
+
+// Raisercostin libs (from GitHub maven repo)
+//DEPS org.raisercostin:jedio:0.102
+//DEPS org.raisercostin:jedi-nodes-java:0.34
+
+// Source files
+//SOURCES Generators.java
+//SOURCES HyperLink.java
+//SOURCES ParallelGraphTraverser.java
+//SOURCES RichPicocli.java
+//SOURCES Slug.java
+//SOURCES ../../../com/namekis/utils/RichCli.java
+
 package org.raisercostin.jcrawler;
 
 import java.io.IOException;
@@ -70,12 +125,13 @@ import org.raisercostin.nodes.Nodes;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import picocli.CommandLine;
+import picocli.CommandLine.ArgGroup;
 import picocli.CommandLine.Command;
-import picocli.CommandLine.IExecutionExceptionHandler;
 import picocli.CommandLine.IVersionProvider;
 import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Spec;
 import reactor.netty.http.HttpProtocol;
+import com.namekis.utils.RichCli;
 
 @AllArgsConstructor
 @ToString
@@ -87,15 +143,35 @@ import reactor.netty.http.HttpProtocol;
     versionProvider = JCrawler.MyVersionProvider.class)
 @Slf4j
 public class JCrawler implements Callable<Integer> {
+  /**
+   * Standard options inherited from RichCli.BaseOptions providing:
+   * -v/--verbose, -q/--quiet, --color, --debug, --trace, --workdir
+   */
+  static class StandardOptions extends RichCli.BaseOptions {
+    // Inherits all standard options from BaseOptions:
+    // -v/--verbose: Increase verbosity (use multiple -vvv)
+    // -q/--quiet: Suppress log output (use multiple -qqq)
+    // --color/--no-color: Enable/disable colored output
+    // --debug: Enable debug mode with detailed logs
+    // --trace: Show full stack traces for errors
+    // --workdir: Base directory for operations
+  }
+
+  @ArgGroup(exclusive = false, heading = "Development options:%n", order = 100)
+  StandardOptions standardOpts = new StandardOptions();
+
   public static void main(String[] args) {
-    //mainOne("--version", true);
-    //mainOne("--debug", true);
-    //mainOne("https://raisercostin.org --traversal=BREADTH_FIRST", true);
-    main(args, true);
+    // Use RichCli for mature logging configuration and error handling
+    RichCli.main(args, () -> new JCrawler());
   }
 
   public static void mainOne(String args, boolean exitAtEnd) {
     main(split(args), exitAtEnd);
+  }
+
+  private static void main(String[] args, boolean exitAtEnd) {
+    // Legacy main for backward compatibility
+    RichCli.main(args, () -> new JCrawler());
   }
 
   private static String[] split(String cmdWithSpaces) {
@@ -197,33 +273,6 @@ public class JCrawler implements Callable<Integer> {
     }
   }
 
-  private static void main(String[] args, boolean exitAtEnd) {
-    IExecutionExceptionHandler errorHandler = (ex, cmd, parseResult) -> {
-      JCrawler config = cmd.getCommand();
-      log.error("Cmd error.", ex);
-      //      if (config.debug) {
-      //        ex.printStackTrace(cmd.getErr()); // Print stack trace to the error stream
-      //      } else {
-      //        cmd.getErr()
-      //          .println(
-      //            cmd.getColorScheme()
-      //              .errorText(ex.getMessage() + ". Use --debug to see stacktrace."));
-      //      }
-      cmd.getErr().println(cmd.getColorScheme().errorText("Use --help or -h for usage."));
-      return cmd.getExitCodeExceptionMapper() != null
-          ? cmd.getExitCodeExceptionMapper().getExitCode(ex)
-          : cmd.getCommandSpec().exitCodeOnExecutionException();
-    };
-
-    CommandLine cmd = new CommandLine(new JCrawler()).setExecutionExceptionHandler(errorHandler);
-    //CommandLine gen = cmd.getSubcommands().get("generate-completion");
-    //gen.getCommandSpec().usageMessage().hidden(false);
-    int exitCode = cmd.execute(args);
-    if (exitAtEnd) {
-      System.exit(exitCode);
-    }
-  }
-
   public static JCrawler crawler() {
     return new JCrawler();
   }
@@ -240,7 +289,7 @@ public class JCrawler implements Callable<Integer> {
   }
 
   private static JCrawler of(DirLocation projectDir, Seq<String> urls) {
-    JCrawler crawler = new JCrawler(null, TraversalType.BREADTH_FIRST, Nodes.json, false, new PicocliDir(projectDir),
+    JCrawler crawler = new JCrawler(new StandardOptions(), null, TraversalType.BREADTH_FIRST, Nodes.json, false, new PicocliDir(projectDir),
       -1, 3, null, Duration.ofDays(100), null, null, Verbosity.INFO, 100, false, null, null, true)
         .withUrlsAndAccept(urls);
     return crawler;
@@ -454,13 +503,13 @@ public class JCrawler implements Callable<Integer> {
   public Seq<String> urls;
   @picocli.CommandLine.Option(names = { "--accept" }, description = "Additional urls to accept.")
   public Set<String> accept;
-  @picocli.CommandLine.Option(names = { "-v", "--verbosity" },
-      description = "Set the verbosity level: ${COMPLETION-CANDIDATES}.")
+  @picocli.CommandLine.Option(names = { "-V", "--verbosity" },
+      description = "Set the verbosity level: ${COMPLETION-CANDIDATES}. (Note: use -v for RichCli verbosity)")
   public Verbosity verbosity = Verbosity.WARN;
   @picocli.CommandLine.Option(names = { "-l", "--level" },
       description = "Limit depth crawling. Given start urls are level 0. All different links from it are level 1.")
   public int depth = 100;
-  @picocli.CommandLine.Option(names = { "--debug" }, description = "Show stack trace")
+  @picocli.CommandLine.Option(names = { "--show-stacktrace" }, description = "Show stack trace on errors")
   public boolean debug = false;
   @picocli.CommandLine.Option(names = { "--acceptHostname" }, description = "Template to accept urls with this prefix.")
   public String acceptHostname = "{http|https}://{www.|}%s";
@@ -608,12 +657,22 @@ public class JCrawler implements Callable<Integer> {
       return accept;
     }
 
+    private static final java.util.Set<String> UNSUPPORTED_PROTOCOLS = java.util.Set.of(
+      "tel:", "mailto:", "javascript:", "data:", "blob:", "file:", "ftp:", "ssh:", "git:");
+
     private boolean accept2(HyperLink link) {
       if (link.depth > config.depth) {
         return false;
       }
       if (accept == null) {
         return false;
+      }
+      // Early filter for unsupported protocols
+      String url = link.externalForm.toLowerCase();
+      for (String protocol : UNSUPPORTED_PROTOCOLS) {
+        if (url.startsWith(protocol)) {
+          return false;
+        }
       }
       return accept.exists(x -> link.externalForm.startsWith(x));
     }
@@ -689,7 +748,15 @@ public class JCrawler implements Callable<Integer> {
             //metaJson.asPathLocation().write("").deleteFile(DeleteOptions.deletePermanent());
             metaJson.asPathLocation().write(content.computeMetadata(metadata));
           } catch (Exception e) {
-            log.info("mark failing server[{}]: {}", hostname, Throwables.getRootCause(e).getMessage());
+            String rootMessage = Throwables.getRootCause(e).getMessage();
+            // Don't mark server as failing for unsupported protocols (tel:, mailto:, javascript:, etc.)
+            // These are link extraction issues, not server issues
+            if (rootMessage != null && rootMessage.contains("unknown protocol")) {
+              log.debug("skipping unsupported protocol [{}]: {}", href.externalForm, rootMessage);
+              destInitial.deleteFile(DeleteOptions.deleteByRenameOption().withIgnoreNonExisting(true));
+              return API.Seq();
+            }
+            log.info("mark failing server[{}]: {}", hostname, rootMessage);
             failingServers.put(hostname, href.externalForm);
             if (metadata == null)
               metadata = Metadata.error(href.externalForm, e);
