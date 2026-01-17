@@ -586,10 +586,20 @@ public class JCrawler implements Callable<Integer> {
     }
     // Check for both .html and .html.gz existence when checking modification time
     if (!dest.exists()) {
-        for(String ext : io.vavr.collection.List.of(".gz", ".br", ".zst")) {
-            ReferenceLocation compressedDest = dest.parentRef().get().child(dest.filename() + ext);
-            if (compressedDest.exists()) {
-                return compressedDest.modifiedDateTime().toInstant().isBefore(Instant.now().minus(cacheExpiryDuration));
+        ReferenceLocation metaJson = dest.meta("", ".meta.json");
+        if (metaJson.exists()) {
+            try {
+                Metadata m = Nodes.json.toObject(metaJson.asReadableFile().readContent(), Metadata.class);
+                String encoding = getEncoding(m);
+                String ext = getExtensionForEncoding(encoding);
+                if (!ext.isEmpty()) {
+                    ReferenceLocation compressedDest = dest.parentRef().get().child(dest.filename() + ext);
+                    if (compressedDest.exists()) {
+                        return compressedDest.modifiedDateTime().toInstant().isBefore(Instant.now().minus(cacheExpiryDuration));
+                    }
+                }
+            } catch (Exception e) {
+                // Ignore and fallback
             }
         }
     }
@@ -621,6 +631,16 @@ public class JCrawler implements Callable<Integer> {
       if (".br".equalsIgnoreCase(ext)) return "br";
       if (".zst".equalsIgnoreCase(ext)) return "zstd";
       return "";
+  }
+
+  public static boolean isSame(ReferenceLocation loc1, ReferenceLocation loc2) {
+      if (loc1 == null || loc2 == null) return false;
+      return loc1.absoluteAndNormalized().equalsIgnoreCase(loc2.absoluteAndNormalized());
+  }
+
+  public static String getEncoding(Metadata meta) {
+      if (meta == null || meta.responseHeaders == null) return null;
+      return meta.responseHeaders.getFirst("Content-Encoding");
   }
 
   public JCrawler withProjectPath(PathLocation dir) {
@@ -1080,14 +1100,14 @@ public class JCrawler implements Callable<Integer> {
       if (source.exists()) {
           content = source.asReadableFile().readContent();
       } else {
-          for(String ext : io.vavr.collection.List.of(".gz", ".br", ".zst")) {
+          String encoding = meta.responseHeaders.getFirst("Content-Encoding");
+          String ext = getExtensionForEncoding(encoding);
+          if (!ext.isEmpty()) {
               ReferenceLocation compressedSource = source.parentRef().get().child(source.filename() + ext);
               if (compressedSource.exists()) {
-                  String encoding = getEncodingFromExtension(ext);
                   try (InputStream is = decompressStream(encoding, compressedSource.asReadableFile().unsafeInputStream())) {
                       content = new String(is.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
                   }
-                  break;
               }
           }
       }
