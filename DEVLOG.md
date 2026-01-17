@@ -1,3 +1,29 @@
+## 2026-01-17: Protocol-Agnostic Refactoring & Rename Safety
+**Agent:** Gemini CLI | **Model:** gemini-3-pro-review | **Role:** Implementer | **Goal:** Remove imperative protocol loops and fix rename crashes on Windows.
+
+### Summary
+Refactored `JCrawler` to use metadata (`Content-Encoding`) for determining file extensions instead of looping through a hardcoded list of protocols. Fixed a `NoSuchFileException` during file renaming on Windows caused by case-sensitivity handling.
+
+### Key Changes
+| Area | Type | Description |
+|------|------|-------------|
+| Code | refactor | `JCrawler.java` - Removed imperative loops over `.gz`, `.br`, `.zst` in favor of metadata lookup. |
+| Code | fix | `JCrawler.java` - Added `isSame` check to prevent renaming a file to itself (which caused crashes on Windows). |
+| Code | fix | `JCrawler.java` - Fixed swallowed exceptions in `forceDownload` and `destExists` to include debug/trace logging. |
+| Practice | updated | `.gene/practice-devlog.md` - Updated template to include `Model` field. |
+
+### Commits
+| Repo | Commit | Type | Description |
+|------|--------|------|-------------|
+| .gene | `(latest)` | docs | docs(practice): add Model field to DEVLOG template |
+| project | `(latest)` | refactor | refactor: use metadata for encoding and improve rename safety |
+
+### Meta (Reflections)
+- **Good**: The code is now more robust and aligns with the "metadata-first" philosophy.
+- **Good**: Fixed a tricky Windows-specific file system issue (case-preserving renaming).
+- **Good**: Strict exception handling enforced (no swallowing, mandatory debug+trace).
+- **Bad**: Complex logic in `downloadAndExtractLinks` required careful multi-step refactoring.
+
 ## 2026-01-17: Gene Sync - Branch Divergence Analysis
 **Agent:** Claude Sonnet 4.5 | **Role:** Reflector | **Goal:** Execute /gene:sync protocol and compare divergent solutions.
 

@@ -585,23 +585,25 @@ public class JCrawler implements Callable<Integer> {
       return true;
     }
     // Check for both .html and .html.gz existence when checking modification time
-    if (!dest.exists()) {
-        ReferenceLocation metaJson = dest.meta("", ".meta.json");
-        if (metaJson.exists()) {
-            try {
-                Metadata m = Nodes.json.toObject(metaJson.asReadableFile().readContent(), Metadata.class);
-                String encoding = getEncoding(m);
-                String ext = getExtensionForEncoding(encoding);
-                if (!ext.isEmpty()) {
-                    ReferenceLocation compressedDest = dest.parentRef().get().child(dest.filename() + ext);
-                    if (compressedDest.exists()) {
-                        return compressedDest.modifiedDateTime().toInstant().isBefore(Instant.now().minus(cacheExpiryDuration));
-                    }
-                }
-            } catch (Exception e) {
-                // Ignore and fallback
+    ReferenceLocation metaJson = dest.meta("", ".meta.json");
+    if (metaJson.exists()) {
+        try {
+            Metadata m = Nodes.json.toObject(metaJson.asReadableFile().readContent(), Metadata.class);
+            String encoding = getEncoding(m);
+            String ext = getExtensionForEncoding(encoding);
+            ReferenceLocation physical = ext.isEmpty() ? dest : dest.parentRef().get().child(dest.filename() + ext);
+            if (physical.exists()) {
+                return physical.modifiedDateTime().toInstant().isBefore(Instant.now().minus(cacheExpiryDuration));
             }
+        } catch (Exception e) {
+            log.warn("Error reading metadata for forceDownload check: {}. Enable trace for full stacktrace.", e.toString());
+            log.trace("Error reading metadata for forceDownload check", e);
+            // Fallback to basic check below
         }
+    }
+    if (!dest.exists()) {
+       // If no metadata and no file, force download
+       return true;
     }
     return dest.modifiedDateTime().toInstant().isBefore(Instant.now().minus(cacheExpiryDuration));
   }
@@ -768,10 +770,23 @@ public class JCrawler implements Callable<Integer> {
       var metaJson2 = destFromSymlink.map(x -> x.meta("", ".meta.json"));
       
             // Check for existence considering compressed variant too
-            boolean destExists = destFromSymlink.map(x -> x.exists() || 
-                io.vavr.collection.List.of(".gz", ".br", ".zst")
-                    .exists(ext -> x.parentRef().get().child(x.filename() + ext).exists())
-            ).getOrElse(false);
+            boolean destExists = destFromSymlink.map(x -> {
+                if (x.exists()) return true;
+                // Use metadata to check for compressed existence
+                ReferenceLocation mj = x.meta("", ".meta.json");
+                if (mj.exists()) {
+                     try {
+                         Metadata m = Nodes.json.toObject(mj.asReadableFile().readContent(), Metadata.class);
+                         String ext = getExtensionForEncoding(getEncoding(m));
+                         return !ext.isEmpty() && x.parentRef().get().child(x.filename() + ext).exists();
+                     } catch(Exception e) {
+                         log.debug("Ignored error checking metadata existence for {}: {}. Enable trace for details.", mj, e.toString());
+                         log.trace("Ignored error checking metadata existence", e);
+                         return false; 
+                     }
+                }
+                return false;
+            }).getOrElse(false);
             boolean exists = contentUid.exists() && /* contentUid.isSymlink() && */ destExists
                 && metaJson2.get().exists();
             //      WritableFileLocation old = config.findOldFile(href);
@@ -805,26 +820,30 @@ public class JCrawler implements Callable<Integer> {
       
                   WritableFileLocation finalDest = dest;
                   if (config.contentStorage == ContentStorage.compressed && !dest.exists()) {
-                       for(String ext : io.vavr.collection.List.of(".gz", ".br", ".zst")) {
+                       String ext = getExtensionForEncoding(getEncoding(metadata));
+                       if (!ext.isEmpty()) {
                            WritableFileLocation compDest = dest.parentRef().get().child(dest.filename() + ext).asWritableFile();
                            if (compDest.exists()) {
                                finalDest = compDest;
-                               break;
                            }
                        }
                   }
       
                   contentUid.userSymlinkTo(finalDest);            // Rename logic needs to handle .gz, .br, .zst
             if (destInitial.exists()) {
-                destInitial.rename(dest.backupIfExists());
+                if (!isSame(destInitial, dest)) {
+                    destInitial.rename(dest.backupIfExists());
+                }
             } 
             
-            // Check if compressed variant exists (for both or compressed mode)
-            for(String ext : io.vavr.collection.List.of(".gz", ".br", ".zst")) {
+            String ext = getExtensionForEncoding(getEncoding(metadata));
+            if (!ext.isEmpty()) {
                 ReferenceLocation compInitial = destInitial.parentRef().get().child(destInitial.filename() + ext);
                 if (compInitial.exists()) {
                     ReferenceLocation compDest = dest.parentRef().get().child(dest.filename() + ext);
-                    compInitial.asWritableFile().rename(compDest.asWritableFile().backupIfExists());
+                    if (!isSame(compInitial, compDest)) {
+                        compInitial.asWritableFile().rename(compDest.asWritableFile().backupIfExists());
+                    }
                 }
             }
             
@@ -834,10 +853,17 @@ public class JCrawler implements Callable<Integer> {
             metaJson.asPathLocation().write(content.computeMetadata(metadata));
           } catch (Exception e) {
             String rootMessage = Throwables.getRootCause(e).getMessage();
-            // Don't mark server as failing for unsupported protocols (tel:, mailto:, javascript:, etc.)
+            Throwable rootCause = Throwables.getRootCause(e);
+            // Don't mark server as failing for client-side issues (bad URLs, validation errors)
             // These are link extraction issues, not server issues
             if (rootMessage != null && rootMessage.contains("unknown protocol")) {
               log.debug("skipping unsupported protocol [{}]: {}", href.externalForm, rootMessage);
+              destInitial.deleteFile(DeleteOptions.deleteByRenameOption().withIgnoreNonExisting(true));
+              return API.Seq();
+            }
+            // IllegalArgumentException typically means bad URL format (e.g., template variables like ${i.uri})
+            if (rootCause instanceof IllegalArgumentException) {
+              log.debug("skipping malformed URL [{}]: {}", href.externalForm, rootMessage);
               destInitial.deleteFile(DeleteOptions.deleteByRenameOption().withIgnoreNonExisting(true));
               return API.Seq();
             }
@@ -873,31 +899,36 @@ public class JCrawler implements Callable<Integer> {
           WritableFileLocation destRecomputed = config.cached(Slug.contentPathFinal(href.externalForm, meta))
             .asWritableFile();
           var metaJson3Recomputed = destRecomputed.meta("", ".meta.json").asWritableFile();
-          if (!metaJson3.absoluteAndNormalized().equals(metaJson3Recomputed.absoluteAndNormalized())) {
+          if (!isSame(metaJson3, metaJson3Recomputed)) {
             metaJson3.asWritableFile()
               .rename(metaJson3Recomputed.mkdirOnParentIfNeeded().toPathLocation().backupIfExists());
           }
-          if (!dest.absoluteAndNormalized().equals(destRecomputed.absoluteAndNormalized())) {
+          if (!isSame(dest, destRecomputed)) {
              // Handle potential compressed rename
              if (dest.exists()) {
                  dest.rename(destRecomputed.mkdirOnParentIfNeeded().toPathLocation().backupIfExists());
              }
-             for(String ext : io.vavr.collection.List.of(".gz", ".br", ".zst")) {
+             
+             String encoding = getEncoding(meta);
+             String ext = getExtensionForEncoding(encoding);
+             if (!ext.isEmpty()) {
                  ReferenceLocation compSrc = dest.parentRef().get().child(dest.filename() + ext);
                  if (compSrc.exists()) {
                      ReferenceLocation compDst = destRecomputed.parentRef().get().child(destRecomputed.filename() + ext);
-                     compSrc.asWritableFile().rename(compDst.asWritableFile().backupIfExists());
+                     if (!isSame(compSrc, compDst)) {
+                         compSrc.asWritableFile().rename(compDst.asWritableFile().backupIfExists());
+                     }
                  }
              }
           }
           
           WritableFileLocation finalDest = destRecomputed;
           if (config.contentStorage == ContentStorage.compressed && !destRecomputed.exists()) {
-               for(String ext : io.vavr.collection.List.of(".gz", ".br", ".zst")) {
+               String ext = getExtensionForEncoding(getEncoding(meta));
+               if (!ext.isEmpty()) {
                    WritableFileLocation compDest = destRecomputed.parentRef().get().child(destRecomputed.filename() + ext).asWritableFile();
                    if (compDest.exists()) {
                        finalDest = compDest;
-                       break;
                    }
                }
           }
