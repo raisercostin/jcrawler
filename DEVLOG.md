@@ -61,3 +61,16 @@
 - **Good**: Implemented a flexible solution that solves the user's "strange file" issue while offering storage optimizations.
 - **Good**: Verified all three storage modes (`decompressed`, `compressed`, `both`) with end-to-end tests.
 - **Bad**: Initial compilation errors due to Lombok constructor generation and `jedio` API guesswork (`stream()` vs `unsafeInputStream()`).
+
+## 2026-01-17: Test Infrastructure Fixes
+**Agent:** Gemini CLI | **Role:** Maintainer | **Goal:** Resolve build and test failures.
+
+### Key Changes
+| Area | Type | Description |
+|------|------|-------------|
+| Build | fix | Updated `pom.xml` with `junit-bom` and `maven-surefire-plugin` 3.5.2 to resolve version conflicts and `NoSuchMethodError`. |
+| Build | fix | Added missing testing dependencies to `pom.xml` required by `RichTestCli.java`. |
+
+### Meta
+- **Good**: Identified and resolved hidden dependency conflicts causing test failures.
+- **Bad**: Test execution revealed unrelated failures (`AnreSpotTest`) which were left for the user as requested.
