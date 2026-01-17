@@ -45,3 +45,19 @@
 
 ### Meta
 - **Bad**: Agent repeatedly ignored user instructions (3x), prioritizing internal assumptions (RichCli fix, Sync order) over explicit user constraints. Lesson: Immediate pivot required on user rejection.
+
+## 2026-01-17: Gzip Decompression & Content Storage Options
+**Agent:** Gemini CLI | **Role:** Implementer | **Goal:** Fix gzipped content storage issue and add flexible storage options.
+
+### Key Changes
+| Area | Type | Description |
+|------|------|-------------|
+| Crawler | feat | Added `--content-storage` option with values `decompressed` (default), `compressed`, `both`. |
+| Crawler | fix | Implemented in-place decompression for `gzip` content to ensure `.html` files are always readable text when `decompressed` or `both` is selected. |
+| Crawler | fix | Updated `CrawlerWorker` to handle renaming of both main and `.gz` sibling files. |
+| Crawler | fix | Updated `extractLinksInMemory` to transparently read from `.gz` files if the main file is missing (supporting `compressed` mode). |
+
+### Meta
+- **Good**: Implemented a flexible solution that solves the user's "strange file" issue while offering storage optimizations.
+- **Good**: Verified all three storage modes (`decompressed`, `compressed`, `both`) with end-to-end tests.
+- **Bad**: Initial compilation errors due to Lombok constructor generation and `jedio` API guesswork (`stream()` vs `unsafeInputStream()`).

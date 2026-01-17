@@ -35,6 +35,9 @@ Crawler tool.
                               Default: {http|https}://{www.|}%s
   -c, --maxConnections=<maxConnections>
                               Default: 3
+      --content-storage=<contentStorage>
+                            How to store content: decompressed, compressed, both.
+                              Default: decompressed
   -d, --maxDocs=<maxDocs>     Default: 10000
       --debug               Show stack trace
       --expire=<cacheExpiryDuration>
@@ -173,9 +176,11 @@ static void main(){
 
 ## Features
 
-- [x] crawler
+  - [x] crawler
   - [x] option to remove query params when searching for new links
   - [x] whitelist from other html
+  - [x] transparent gzip decompression support
+  - [x] flexible content storage (compressed, decompressed, both)
   - [x] strategies
     - [x] guava traversers
       - [x] depth first

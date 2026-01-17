@@ -290,7 +290,7 @@ public class JCrawler implements Callable<Integer> {
 
   private static JCrawler of(DirLocation projectDir, Seq<String> urls) {
     JCrawler crawler = new JCrawler(new StandardOptions(), null, TraversalType.BREADTH_FIRST, Nodes.json, false, new PicocliDir(projectDir),
-      -1, 3, null, Duration.ofDays(100), null, null, 100, false, null, null, true)
+      -1, 3, null, Duration.ofDays(100), null, null, 100, false, null, ContentStorage.decompressed, null, true)
         .withUrlsAndAccept(urls);
     return crawler;
   }
@@ -490,6 +490,14 @@ public class JCrawler implements Callable<Integer> {
   public boolean debug = false;
   @picocli.CommandLine.Option(names = { "--acceptHostname" }, description = "Template to accept urls with this prefix.")
   public String acceptHostname = "{http|https}://{www.|}%s";
+  public enum ContentStorage {
+    decompressed,
+    compressed,
+    both
+  }
+
+  @picocli.CommandLine.Option(names = { "--content-storage" }, description = "How to store content: ${COMPLETION-CANDIDATES}.")
+  public ContentStorage contentStorage = ContentStorage.decompressed;
   public String crawlFormat = "";
   @picocli.CommandLine.Option(names = { "--migrate" }, description = "Migrate takes time to re-read metadata")
   public boolean migrate = true;
@@ -570,6 +578,13 @@ public class JCrawler implements Callable<Integer> {
   public boolean forceDownload(HyperLink href, WritableFileLocation dest) {
     if (cacheExpiryDuration == null) {
       return true;
+    }
+    // Check for both .html and .html.gz existence when checking modification time
+    if (!dest.exists()) {
+        ReferenceLocation gzDest = dest.parentRef().get().child(dest.filename() + ".gz");
+        if (gzDest.exists()) {
+            return gzDest.modifiedDateTime().toInstant().isBefore(Instant.now().minus(cacheExpiryDuration));
+        }
     }
     return dest.modifiedDateTime().toInstant().isBefore(Instant.now().minus(cacheExpiryDuration));
   }
@@ -697,7 +712,10 @@ public class JCrawler implements Callable<Integer> {
 
       var destFromSymlink = contentUid.existingRef().map(x -> x.userSymlinkTarget());
       var metaJson2 = destFromSymlink.map(x -> x.meta("", ".meta.json"));
-      boolean exists = contentUid.exists() && /* contentUid.isSymlink() && */ destFromSymlink.get().exists()
+      
+      // Check for existence considering compressed variant too
+      boolean destExists = destFromSymlink.map(x -> x.exists() || x.parentRef().get().child(x.filename() + ".gz").exists()).getOrElse(false);
+      boolean exists = contentUid.exists() && /* contentUid.isSymlink() && */ destExists
           && metaJson2.get().exists();
       //      WritableFileLocation old = config.findOldFile(href);
       //      WritableFileLocation dest = config.cached(href).asWritableFile();
@@ -723,8 +741,32 @@ public class JCrawler implements Callable<Integer> {
             metadata.addField("crawler.slug", href.slug());
             dest = config.cached(Slug.contentPathFinal(href.externalForm, metadata)).asWritableFile();
             contentUid.asPathLocation().deleteFile(DeleteOptions.deleteByRenameOption().withIgnoreNonExisting(true));
-            contentUid.userSymlinkTo(dest);
-            destInitial.rename(dest.backupIfExists());
+            // Adjust userSymlinkTo to point to the canonical file name (without .gz), even if physical file is .gz?
+            // Symlink usually points to existing file.
+            // If we only store compressed, dest (without .gz) doesn't exist.
+            // So we might need to point to dest + ".gz" if that's what we kept.
+            
+            WritableFileLocation finalDest = dest;
+            if (config.contentStorage == ContentStorage.compressed && !dest.exists()) {
+                 WritableFileLocation gzDest = dest.parentRef().get().child(dest.filename() + ".gz").asWritableFile();
+                 if (gzDest.exists()) {
+                     finalDest = gzDest;
+                 }
+            }
+            
+            contentUid.userSymlinkTo(finalDest);
+            // Rename logic needs to handle .gz
+            if (destInitial.exists()) {
+                destInitial.rename(dest.backupIfExists());
+            } 
+            
+            // Check if .gz exists (for both or compressed mode)
+            ReferenceLocation gzInitial = destInitial.parentRef().get().child(destInitial.filename() + ".gz");
+            if (gzInitial.exists()) {
+                ReferenceLocation gzDest = dest.parentRef().get().child(dest.filename() + ".gz");
+                gzInitial.asWritableFile().rename(gzDest.asWritableFile().backupIfExists());
+            }
+            
             ReferenceLocation metaJson = dest.meta("", ".meta.json");
             //dest.touch();
             //metaJson.asPathLocation().write("").deleteFile(DeleteOptions.deletePermanent());
@@ -755,6 +797,12 @@ public class JCrawler implements Callable<Integer> {
         }
       } else {
         dest = destFromSymlink.get().asWritableFile();
+        // If symlink points to .gz, we need to strip extension to get "logical" dest? 
+        // No, dest is just used for metadata sibling resolution.
+        if (dest.extension().equals("gz")) {
+            dest = dest.parentRef().get().child(org.apache.commons.io.FilenameUtils.removeExtension(dest.filename())).asWritableFile();
+        }
+        
         //recompute meta
         if (config.migrate) {
           ReferenceLocation metaJson3 = dest.meta("", ".meta.json");
@@ -769,9 +817,26 @@ public class JCrawler implements Callable<Integer> {
               .rename(metaJson3Recomputed.mkdirOnParentIfNeeded().toPathLocation().backupIfExists());
           }
           if (!dest.absoluteAndNormalized().equals(destRecomputed.absoluteAndNormalized())) {
-            dest.rename(destRecomputed.mkdirOnParentIfNeeded().toPathLocation().backupIfExists());
+             // Handle potential .gz rename
+             if (dest.exists()) {
+                 dest.rename(destRecomputed.mkdirOnParentIfNeeded().toPathLocation().backupIfExists());
+             } else {
+                 ReferenceLocation gzSrc = dest.parentRef().get().child(dest.filename() + ".gz");
+                 if (gzSrc.exists()) {
+                     ReferenceLocation gzDst = destRecomputed.parentRef().get().child(destRecomputed.filename() + ".gz");
+                     gzSrc.asWritableFile().rename(gzDst.asWritableFile().backupIfExists());
+                 }
+             }
           }
-          contentUid.userSymlinkTo(dest);
+          
+          WritableFileLocation finalDest = destRecomputed;
+          if (config.contentStorage == ContentStorage.compressed && !destRecomputed.exists()) {
+               WritableFileLocation gzDest = destRecomputed.parentRef().get().child(destRecomputed.filename() + ".gz").asWritableFile();
+               if (gzDest.exists()) {
+                   finalDest = gzDest;
+               }
+          }
+          contentUid.userSymlinkTo(finalDest);
           //links should also be renamed?
 
           dest = destRecomputed;
@@ -845,7 +910,7 @@ public class JCrawler implements Callable<Integer> {
       java.util.List<String> headers = headers(
         """
               Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
-              Accept-Encoding: gzip, deflate, br, zstd, identity
+              Accept-Encoding: gzip, deflate, identity
               Accept-Language: en-US,en;q=0.9,ro;q=0.8,hu;q=0.7
               Referer: https://cgi.njoyn.com/
               Upgrade-Insecure-Requests: 1
@@ -867,6 +932,26 @@ public class JCrawler implements Callable<Integer> {
       try {
         HttpResponse<Path> response = client2.send(request,
           HttpResponse.BodyHandlers.ofFile(dest.asPathLocation().toPath()));
+        
+        String encoding = response.headers().firstValue("Content-Encoding").orElse("");
+        if ("gzip".equalsIgnoreCase(encoding)) {
+           Path path = dest.asPathLocation().toPath();
+           Path tempPath = path.resolveSibling(path.getFileName() + ".gz");
+           // Move original to .gz
+           java.nio.file.Files.move(path, tempPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+           
+           if (config.contentStorage == ContentStorage.decompressed || config.contentStorage == ContentStorage.both) {
+               try (InputStream raw = java.nio.file.Files.newInputStream(tempPath);
+                    InputStream is = new java.util.zip.GZIPInputStream(raw);
+                    java.io.OutputStream fos = java.nio.file.Files.newOutputStream(path)) {
+                    is.transferTo(fos);
+               }
+           }
+           if (config.contentStorage == ContentStorage.decompressed) {
+               java.nio.file.Files.delete(tempPath);
+           }
+        }
+
         // Access request and response details
         //        HttpRequest sentRequest = response.request();
         int statusCode = response.statusCode();
@@ -919,6 +1004,7 @@ public class JCrawler implements Callable<Integer> {
     //val notParsedUrls = Seq("javascript", "tel")
     //Extract links from content taking into consideration the base url but also the possible <base> tag attribute.
     //<base href="http://www.cartierbratieni.ro/" />
+    @SneakyThrows
     private Traversable<HyperLink> extractLinksInMemory(HyperLink parent, WritableFileLocation source,
         Metadata meta) {
       if (meta.responseHeaders == null) {
@@ -945,7 +1031,19 @@ public class JCrawler implements Callable<Integer> {
           log.trace("Ignoring links cache from {} and read links again for a parsing error.", metaLinks, e);
         }
       }
-      String content = source.asReadableFile().readContent();
+      String content;
+      if (source.exists()) {
+          content = source.asReadableFile().readContent();
+      } else {
+          ReferenceLocation gzSource = source.parentRef().get().child(source.filename() + ".gz");
+          if (gzSource.exists()) {
+              try (InputStream is = new java.util.zip.GZIPInputStream(gzSource.asReadableFile().unsafeInputStream())) {
+                  content = new String(is.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+              }
+          } else {
+              content = "";
+          }
+      }
       //Option<String> contentType = meta.responseHeaders.getContentType()==MediaType.TEXT_HTML;
       MediaType contentType = meta.responseHeaders.getContentType();
       boolean isHtmlAnd200 = meta.statusCodeValue == 200 && contentType != null
