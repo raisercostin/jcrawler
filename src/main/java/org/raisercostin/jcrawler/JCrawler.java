@@ -706,6 +706,9 @@ public class JCrawler implements Callable<Integer> {
 
     private boolean accept(HyperLink link) {
       boolean accept = accept2(link);
+      if (!accept && link.isRedirect) {
+          log.warn("Redirect target ignored by accept filter: [{}]. If this content is needed, add the domain to --accept.", link.externalForm);
+      }
       log.debug("{} [{}]", accept ? "accept" : "ignore", link.externalForm);
       return accept;
     }
@@ -1169,7 +1172,7 @@ public class JCrawler implements Callable<Integer> {
         all = all
           .append(
             HyperLink.of(url, parent.depth + 1, "Moved - http status " + status, null, "", sourceUrl,
-              source.toExternalForm()));
+              source.toExternalForm(), true));
       }
       //      YAMLMapper mapper = Nodes.yml.mapper();
       //      mapper.configure(YAMLGenerator.Feature.LITERAL_BLOCK_STYLE, true);

@@ -17,16 +17,21 @@ import org.raisercostin.jedio.url.SimpleUrl;
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class HyperLink {
   public static HyperLink of(String url) {
-    return new HyperLink(url, 0, toLocalCache(url), "original", "", null, null, null, null);
+    return new HyperLink(url, 0, toLocalCache(url), "original", "", null, null, null, null, false);
   }
 
   public static HyperLink of(String relativeOrAbsoluteHyperlink, int depth, String text,
       String anchor, String all, String sourceHyperlink, String sourceLocalCache) {
+    return of(relativeOrAbsoluteHyperlink, depth, text, anchor, all, sourceHyperlink, sourceLocalCache, false);
+  }
+
+  public static HyperLink of(String relativeOrAbsoluteHyperlink, int depth, String text,
+      String anchor, String all, String sourceHyperlink, String sourceLocalCache, boolean isRedirect) {
     String url = SimpleUrl.resolve(sourceHyperlink, relativeOrAbsoluteHyperlink);
     //WebClientLocation link = Locations.url(sourceHyperlink, relativeOrAbsoluteHyperlink);
     //TODO link should not contain #fragments since link is used for uniqueness
     return new HyperLink(url, depth, toLocalCache(url), relativeOrAbsoluteHyperlink, text, anchor, all, sourceHyperlink,
-      sourceLocalCache);
+      sourceLocalCache, isRedirect);
   }
 
   private static Slug toLocalCache(String url) {
@@ -45,6 +50,7 @@ public class HyperLink {
   String all;
   String sourceHyperlink;
   String sourceLocalCache;
+  boolean isRedirect;
 
   @ToString.Include
   String text() {
