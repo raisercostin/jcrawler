@@ -10,6 +10,9 @@
 | Testing | added | Created `JCrawlerLinkExtractionTest.java` with 8 integration tests. |
 | Testing | refactor | Consolidated `SlugTest.java` and removed redundant diagnostic tests. |
 
+### History
+- Archived to: `.history/2026-02-01-fix-crawl-errors.md`
+
 ### Meta
 - **Good**: Using `*DebugTest` methods within component tests allows for rapid isolated behavior exploration while keeping the test suite organized.
 - **Good**: The systematic "replication test first" approach quickly isolated the trailing space issue on Windows.
