@@ -472,4 +472,30 @@ class JCrawlerTest {
           .isFalse();
     }
   }
+
+  @Test
+  void testIssue004_EncodedTemplateVariableShouldBeSkipped() {
+    String sourceUrl = "https://example.com";
+    String content = "<a href=\"https://www.projects-mobility.com/blog/categories/$%7Bi.uri%7D\">Link</a>";
+
+    io.vavr.collection.Iterator<HyperLink> links = JCrawler.extractLinksFromContent(0, content, null, sourceUrl);
+
+    assertThat(links.toJavaList()).isEmpty();
+  }
+
+  @Test
+  void testIssue004_ExtremelyLongUrlShouldNotCauseException() {
+    String sourceUrl = "https://example.com";
+    StringBuilder longQuery = new StringBuilder("?");
+    for (int i = 0; i < 3000; i++) {
+      longQuery.append("a").append(i).append("=val").append(i).append("&");
+    }
+    String longUrl = "https://example.com/api" + longQuery.toString();
+    String content = "<img src=\"" + longUrl + "\">";
+
+    // This should now be skipped by the length limit (> 2000 chars)
+    io.vavr.collection.Iterator<HyperLink> links = JCrawler.extractLinksFromContent(0, content, null, sourceUrl);
+
+    assertThat(links.toJavaList()).isEmpty();
+  }
 }

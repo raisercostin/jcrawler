@@ -457,9 +457,17 @@ public class JCrawler implements Callable<Integer> {
             return io.vavr.collection.List.<HyperLink>empty().iterator();
           }
 
-          // Skip template variables BEFORE decoding (e.g., ${i.uri})
-          if (url.contains("${") && url.contains("}")) {
+          // Skip template variables BEFORE decoding (e.g., ${i.uri} or encoded
+          // $%7Bi.uri%7D)
+          if ((url.contains("${") && url.contains("}")) || (url.contains("$%7B") && url.contains("%7D"))) {
             log.debug("Skipping template variable URL: {}", url);
+            return io.vavr.collection.List.<HyperLink>empty().iterator();
+          }
+
+          // Skip extremely long URLs that are likely dynamic model/Wix APIs causing
+          // validation failures
+          if (url.length() > 2000) {
+            log.debug("Skipping extremely long URL (length={}): {}", url.length(), url.substring(0, 100));
             return io.vavr.collection.List.<HyperLink>empty().iterator();
           }
 
