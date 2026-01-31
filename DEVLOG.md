@@ -1,3 +1,21 @@
+## 2026-02-01: Fix Crawl Errors (Data URIs & Template Variables)
+**Agent:** Antigravity | **Role:** Implementer | **Goal:** Resolve InvalidPathException and IllegalArgumentException in crawler.
+
+### Key Changes
+| Area | Type | Description |
+|------|------|-------------|
+| Crawler | fix | Implemented mandatory `trim()` on extracted URLs in `extractLinksFromContent` to fix Windows `InvalidPathException`. |
+| Crawler | fix | Moved protocol filtering to the top of `accept()` to ensure `data:` URIs are rejected early. |
+| Crawler | fix | Added detection for corrupted data URIs and template variables `${...}` before/after decoding. |
+| Testing | added | Created `JCrawlerLinkExtractionTest.java` with 8 integration tests. |
+| Testing | refactor | Consolidated `SlugTest.java` and removed redundant diagnostic tests. |
+
+### Meta
+- **Good**: Using `*DebugTest` methods within component tests allows for rapid isolated behavior exploration while keeping the test suite organized.
+- **Good**: The systematic "replication test first" approach quickly isolated the trailing space issue on Windows.
+- **Bad**: Initially used separate `Debug*` test classes, which cluttered the test namespace.
+- **Ugly**: Windows file system limitations (path length/chars) continue to be the primary friction point for crawler robustness.
+
 ## 2026-01-17: Gene Sync - Branch Divergence Analysis
 **Agent:** Claude Sonnet 4.5 | **Role:** Reflector | **Goal:** Execute /gene:sync protocol and compare divergent solutions.
 

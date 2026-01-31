@@ -429,7 +429,7 @@ public class JCrawler implements Callable<Integer> {
           .takeWhile(m -> m.find());
 
       return allMatches.flatMap(m -> {
-        String url = linkMatcher.hasUrl ? m.group("url").trim() : null;
+        String url = linkMatcher.hasUrl ? m.group("url") != null ? m.group("url").trim() : null : null;
         String directive = linkMatcher.hasDirective ? m.group("directive") != null ? m.group("directive").trim() : ""
             : null;
         String srcset = linkMatcher.hasSrcSet && m.group("srcset") != null ? m.group("srcset").trim() : "";
@@ -449,6 +449,47 @@ public class JCrawler implements Callable<Integer> {
         }
         io.vavr.collection.List<HyperLink> links = io.vavr.collection.List.empty();
         if (url != null) {
+          // Skip data URIs BEFORE decoding
+          // Also skip corrupted versions like data\uF03A (result of Slug transformation)
+          String lowerUrl = url.toLowerCase();
+          if (lowerUrl.startsWith("data:") || lowerUrl.startsWith("data\uF03A") || lowerUrl.startsWith("dataimage/")) {
+            log.debug("Skipping data URI: {}", url.substring(0, Math.min(50, url.length())));
+            return io.vavr.collection.List.<HyperLink>empty().iterator();
+          }
+
+          // Skip template variables BEFORE decoding (e.g., ${i.uri})
+          if (url.contains("${") && url.contains("}")) {
+            log.debug("Skipping template variable URL: {}", url);
+            return io.vavr.collection.List.<HyperLink>empty().iterator();
+          }
+
+          // Decode URL to handle double-encoded URLs (e.g., %257B -> %7B)
+          try {
+            String decodedUrl = java.net.URLDecoder.decode(url, java.nio.charset.StandardCharsets.UTF_8).trim();
+
+            if (!decodedUrl.equals(url)) {
+              // Skip decoded data URIs (e.g., data%3Aimage -> data:image)
+              String lowerDecoded = decodedUrl.toLowerCase();
+              if (lowerDecoded.startsWith("data:") || lowerDecoded.startsWith("data\uF03A")
+                  || lowerDecoded.startsWith("dataimage/")) {
+                log.debug("Skipping decoded data URI: {}", decodedUrl.substring(0, Math.min(50, decodedUrl.length())));
+                return io.vavr.collection.List.<HyperLink>empty().iterator();
+              }
+
+              // Skip template variables after decoding (e.g., $%7Bi.uri%7D -> ${i.uri})
+              if (decodedUrl.contains("${") && decodedUrl.contains("}")) {
+                log.debug("Skipping decoded template variable URL: {}", decodedUrl);
+                return io.vavr.collection.List.<HyperLink>empty().iterator();
+              }
+
+              // Use decoded URL (this handles double-encoding)
+              url = decodedUrl;
+              log.debug("Decoded URL: {}", url.substring(0, Math.min(100, url.length())));
+            }
+          } catch (Exception e) {
+            log.debug("Failed to decode URL, using original: {}", e.getMessage());
+          }
+
           links = links.append(HyperLink.of(url, depth, directive != null ? directive : "", null, m.group().trim(),
               sourceUrl, source, false, isResource));
         }
@@ -490,6 +531,12 @@ public class JCrawler implements Callable<Integer> {
               // Remove spaces that Jsoup added within the URL (e.g., "w_263, h_189" ->
               // "w_263,h_189")
               srcsetUrl = srcsetUrl.replaceAll("\\s+", "");
+
+              // Skip data URIs in srcset
+              if (srcsetUrl.toLowerCase().startsWith("data:")) {
+                log.debug("Skipping data URI in srcset: {}", srcsetUrl.substring(0, Math.min(50, srcsetUrl.length())));
+                continue;
+              }
 
               links = links.append(HyperLink.of(srcsetUrl, depth, descriptor, null, m.group().trim(), sourceUrl, source,
                   false, isResource));
@@ -851,10 +898,15 @@ public class JCrawler implements Callable<Integer> {
 
     // Visible for testing
     boolean accept(HyperLink link) {
+      String url = link.externalForm.toLowerCase();
+      for (String protocol : UNSUPPORTED_PROTOCOLS) {
+        if (url.startsWith(protocol)) {
+          return false;
+        }
+      }
       boolean accept = accept2(link);
       if (!accept) {
         if (link.depth <= config.depth) {
-          String url = link.externalForm.toLowerCase();
           boolean unsupported = false;
           for (String protocol : UNSUPPORTED_PROTOCOLS) {
             if (url.startsWith(protocol)) {
