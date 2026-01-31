@@ -7,6 +7,7 @@
 | Crawler | fix | Implemented mandatory `trim()` on extracted URLs in `extractLinksFromContent` to fix Windows `InvalidPathException`. |
 | Crawler | fix | Moved protocol filtering to the top of `accept()` to ensure `data:` URIs are rejected early. |
 | Crawler | fix | Added detection for corrupted data URIs and template variables `${...}` before/after decoding. |
+| Security | fix | Upgraded `assertj-core` to `3.27.7` to resolve Dependabot alert #7 (High severity). |
 | Testing | added | Created `JCrawlerLinkExtractionTest.java` with 8 integration tests. |
 | Testing | refactor | Consolidated `SlugTest.java` and removed redundant diagnostic tests. |
 
