@@ -1,0 +1,123 @@
+package org.raisercostin.jcrawler;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import io.vavr.collection.Iterator;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
+import org.raisercostin.jedio.Locations;
+import org.raisercostin.jedio.Metadata;
+import org.raisercostin.jedio.path.PathLocation;
+import org.raisercostin.nodes.Nodes;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+public class Localizer {
+
+    private final Map<String, PathLocation> globalUrlMap = new HashMap<>();
+
+    public void run(List<PathLocation> inputs, PathLocation output) {
+        // 1. Index Phase
+        for (PathLocation input : inputs) {
+            indexDirectory(input, input); // Using input as root for itself
+        }
+
+        // 2. Process Phase
+        for (PathLocation input : inputs) {
+            processDirectory(input, output);
+        }
+    }
+
+    private void indexDirectory(PathLocation currentDir, PathLocation root) {
+        currentDir.findFilesRecursive().forEach(file -> {
+            if (file.extension().equals("json")) {
+                // Check if it's a meta file
+                if (file.filename().endsWith(".meta.json")) {
+                    try {
+                        String content = file.readContent();
+                        if (!content.isEmpty()) {
+                            Metadata meta = Nodes.json.toObject(content, Metadata.class);
+                            if (meta.url != null) {
+                                // Map URL to the *actual file* (the sibling of .meta.json)
+                                // Standard: file.html.meta.json -> file.html
+                                String actualFilename = file.filename().substring(0, file.filename().length() - ".meta.json".length());
+                                PathLocation actualFile = file.parent().child(actualFilename);
+                                globalUrlMap.put(meta.url, actualFile);
+                                // Also handle fragments if needed? No, map base URL.
+                            }
+                        }
+                    } catch (Exception e) {
+                        log.warn("Failed to read metadata from {}", file, e);
+                    }
+                }
+            }
+        });
+    }
+
+    private void processDirectory(PathLocation input, PathLocation output) {
+        // Copy everything first? Or process one by one?
+        // Better to copy structure and mutable files.
+        // But we want to merge multiple inputs into one output 'offline' folder if possible?
+        // No, plan says "preserving structure offline/site1/, offline/site2/".
+        // So we need to map input root to output subdirectory.
+        
+        // This mapping is tricky if we just have a list of inputs.
+        // We should replicate exact folder name.
+        
+        input.findFilesRecursive().forEach(file -> {
+            // Replicate relative path in output
+            String relative = file.relativePath(input);
+            PathLocation dest = output.child(input.filename()).child(relative); // offline/site1/page.html
+            
+            if (file.extension().equals("html") || file.extension().equals("htm")) {
+                 localizeHtml(file, dest);
+            } else {
+                 if (!file.filename().endsWith(".meta.json") && !file.filename().endsWith(".links.json")) { // Skip meta files?
+                    file.copyToFile(dest);
+                 }
+            }
+        });
+    }
+
+    private void localizeHtml(PathLocation source, PathLocation dest) {
+         try {
+             String content = source.readContent();
+             Document doc = Jsoup.parse(content);
+             
+             // Rewrite links
+             rewriteElements(doc, "a", "href", dest);
+             rewriteElements(doc, "link", "href", dest);
+             rewriteElements(doc, "img", "src", dest);
+             rewriteElements(doc, "script", "src", dest);
+             
+             dest.write(doc.outerHtml());
+         } catch(Exception e) {
+             log.error("Failed to localize {}", source, e);
+             source.copyToFile(dest); // Fallback
+         }
+    }
+
+    private void rewriteElements(Document doc, String tag, String attr, PathLocation currentFile) {
+        Elements elements = doc.select(tag + "[" + attr + "]");
+        for (Element el : elements) {
+            String originalLink = el.attr(attr);
+            String newLink = transformLink(originalLink, currentFile);
+            if (!newLink.equals(originalLink)) {
+                el.attr(attr, newLink);
+            }
+        }
+    }
+
+    private String transformLink(String link, PathLocation currentFile) {
+        // Logic to verify...
+        // 1. Check if link is in Global Map (Absolute URL)
+        // 2. Check if link is absolute path strings "/foo" -> map to current site root?
+        return link; // Placeholder
+    }
+}

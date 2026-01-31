@@ -144,7 +144,7 @@
 ### Meta
 - **Good**: Leveraged the existing decompression framework to easily add new formats.
 - **Note**: Requires native libraries via JNI for Zstd, which `zstd-jni` handles automatically.
-## 2026-01-17: IllegalArgumentException Handling Fix  
+## 2026-01-17: IllegalArgumentException Handling Fix
 **Agent:** Claude Sonnet 4.5 | **Role:** Debugger | **Goal:** Fix iterator hanging on malformed URL exceptions.
 
 ### Key Changes
@@ -165,7 +165,7 @@ Added specific handling for `IllegalArgumentException` to distinguish client-sid
 
 ### Meta
 - **Good**: Systematic debugging identified the specific exception type and source
-- **Good**: Solution prevents both the hanging bug and the misleading "mark failing server" message  
+- **Good**: Solution prevents both the hanging bug and the misleading "mark failing server" message
 - **Good**: Tested with actual malformed URL and verified crawler completes successfully
 - **Note**: ParallelGraphTraverser exception handling (from earlier commits) was already working - this fix improves error messages and server failure logic
 
@@ -194,3 +194,25 @@ Refactored `JCrawler` to use metadata (`Content-Encoding`) for determining file 
 - **Good**: Fixed a tricky Windows-specific file system issue (case-preserving renaming).
 - **Good**: Strict exception handling enforced (no swallowing, mandatory debug+trace).
 - **Bad**: Complex logic in `downloadAndExtractLinks` required careful multi-step refactoring.
+
+## 2026-01-31: Refactoring Rewriter and Jsoup Analysis
+**Agent:** Gemini CLI | **Role:** Refactorer | **Goal:** Rename Localizer to Rewriter and implement Jsoup-based context-aware analysis.
+
+### Key Changes
+| Area | Type | Description |
+|------|------|-------------|
+| Code | refactor | Renamed `Localizer` to `Rewriter` and updated all references in `JCrawler.java` and tests. |
+| Test | refactor | Ported `AnalysisTest.java` to use Jsoup, enabling `[link]` vs `[resource]` classification. |
+| Code | fix | `Rewriter.java`: Added URL decoding fallbacks to handle mismatched encoding (e.g. `%7B` vs `{`) in metadata vs HTML. |
+| Code | fix | `Rewriter.java`: Fixed `rewriteElements` to correctly handle `<link>` tags. |
+| Tooling | fix | `RichCli.java`: Added `exitAtEnd` parameter to improve testability of CLI commands. |
+
+### Commits
+| Repo | Commit | Type | Description |
+|------|--------|------|-------------|
+| project | `(pending)` | refactor | refactor: rename Localizer to Rewriter and improve analysis with Jsoup |
+
+### Meta
+- **Good**: `AnalysisTest` with Jsoup proved much more effective than regex, identifying subtle encoding issues and missing tag handlers.
+- **Good**: Refactoring `RichCli` to be test-friendly allowed verification without system exits.
+- **Note**: Full re-run on large crawl data was skipped to save time; `AnalysisTest` was used to verify fixes on existing data.

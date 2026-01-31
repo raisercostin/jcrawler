@@ -3,6 +3,8 @@ package com.namekis.utils;
 
 //DEPS ch.qos.logback:logback-classic:1.4.11
 //DEPS ch.qos.logback:logback-core:1.4.11
+//DEPS info.picocli:picocli:4.7.5
+//DEPS info.picocli:picocli:4.7.5
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -183,6 +185,10 @@ public class RichCli {
   }
 
   public static void main(String[] args, Supplier<Object> command) {
+    main(args, command, true);
+  }
+
+  public static void main(String[] args, Supplier<Object> command, boolean exitAtEnd) {
     BaseOptions opts = configureLogbackByVerbosity(args);
     CommandLine cmd = new CommandLine(command.get());
     cmd.setExecutionExceptionHandler((ex, commandLine, parseResult) -> {
@@ -194,7 +200,7 @@ public class RichCli {
       return commandLine.getCommandSpec().exitCodeOnExecutionException();
     });
     int res = cmd.execute(args);
-    if (res != 0) {
+    if (exitAtEnd && res != 0) {
       System.exit(res);
     }
   }

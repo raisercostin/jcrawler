@@ -38,3 +38,12 @@
 /.logs
 /.crawl*
 /.jcrawler/
+/.jcrawler1
+/.jcrawler2
+/.local-view-test
+/.local-view-verify
+/.local-view
+/.jcrawler-test
+
+### Testing ###
+.jqwik-database

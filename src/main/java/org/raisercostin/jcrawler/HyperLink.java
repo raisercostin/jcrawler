@@ -17,21 +17,29 @@ import org.raisercostin.jedio.url.SimpleUrl;
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class HyperLink {
   public static HyperLink of(String url) {
-    return new HyperLink(url, 0, toLocalCache(url), "original", "", null, null, null, null, false);
+    return new HyperLink(url, 0, toLocalCache(url), "original", "", null, null, null, null, false, false);
   }
 
   public static HyperLink of(String relativeOrAbsoluteHyperlink, int depth, String text,
       String anchor, String all, String sourceHyperlink, String sourceLocalCache) {
-    return of(relativeOrAbsoluteHyperlink, depth, text, anchor, all, sourceHyperlink, sourceLocalCache, false);
+    return of(relativeOrAbsoluteHyperlink, depth, text, anchor, all, sourceHyperlink, sourceLocalCache, false, false);
   }
 
   public static HyperLink of(String relativeOrAbsoluteHyperlink, int depth, String text,
       String anchor, String all, String sourceHyperlink, String sourceLocalCache, boolean isRedirect) {
+    return of(relativeOrAbsoluteHyperlink, depth, text, anchor, all, sourceHyperlink, sourceLocalCache, isRedirect,
+        false);
+  }
+
+  public static HyperLink of(String relativeOrAbsoluteHyperlink, int depth, String text,
+      String anchor, String all, String sourceHyperlink, String sourceLocalCache, boolean isRedirect,
+      boolean isResource) {
     String url = SimpleUrl.resolve(sourceHyperlink, relativeOrAbsoluteHyperlink);
-    //WebClientLocation link = Locations.url(sourceHyperlink, relativeOrAbsoluteHyperlink);
-    //TODO link should not contain #fragments since link is used for uniqueness
+    // WebClientLocation link = Locations.url(sourceHyperlink,
+    // relativeOrAbsoluteHyperlink);
+    // TODO link should not contain #fragments since link is used for uniqueness
     return new HyperLink(url, depth, toLocalCache(url), relativeOrAbsoluteHyperlink, text, anchor, all, sourceHyperlink,
-      sourceLocalCache, isRedirect);
+        sourceLocalCache, isRedirect, isResource);
   }
 
   private static Slug toLocalCache(String url) {
@@ -51,6 +59,7 @@ public class HyperLink {
   String sourceHyperlink;
   String sourceLocalCache;
   boolean isRedirect;
+  boolean isResource;
 
   @ToString.Include
   String text() {

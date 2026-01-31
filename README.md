@@ -281,9 +281,58 @@ static void main(){
 - [ ] scraping
   - [ ] jsoup convert
 
-## Competition
+## Competition & Inspiration
 
-- <https://scrapy.org/>
+There are several mature tools in this space. `jcrawler` aims to fill the gap for a modern, Java-based, fluent, and highly customizable crawler that handles modern web complexities (like `srcset`, deep resource linking, and proper offline viewing) out of the box.
+
+### `wget`
+- **Good**: Standard tool, robust, supports recursive crawl (`-r`) and page requisites (`-p`).
+- **Gap**:
+    - "Page Requisites" (`-p`) often misses modern assets like `srcset`, images in CSS `url()`, or JSON data.
+    - Handling of "ownership via redirect" (following redirects from internal links to external domains) can be tricky to configure without opening the floodgates to all external links.
+    - No specialized logic for "offline viewable" local structures (rewriting links for local browsing is limited).
+- **Inspiration**: We follow `wget`'s philosophy of "accepting page resources" by default, but extend it to more asset types.
+
+### `httrack`
+- **Good**: Excellent for offline mirrors, robust link rewriting.
+- **Gap**:
+    - Older codebase, less customizable via modern languages (Java/Kotlin).
+    - Can be aggressive with resources.
+- **Inspiration**: The goal of creating a perfectly navigable offline mirror is shared.
+
+### `browsers` (Save Page As... / MHTML / Web Archive)
+- **Good**: Perfect rendering (JS execution). MHTML bundles everything into a single file.
+- **Gap**:
+    - Manual process.
+    - MHTML/WebArchives are great for single pages (preservation) but are not "browsable sites" (you can't click internal links and stay within the archive easily).
+    - "WebComplete" or "SingleFile" extensions are excellent but similarly focused on page-by-page preservation.
+    - `jcrawler` aims to provide that "Save Page As" completeness for *recursive* site structures, maintainable as standard files.
+
+### `scrapy` (Python)
+- **Good**: Industry standard for scraping.
+- **Gap**:
+    - steep learning curve for non-Python devs.
+    - Focused more on *data extraction* (scraping) than *site traversing/mirroring* (crawling for offline view).
+
+### Java Ecosystem (`crawler4j`, `nutch`, `webmagic`)
+- **`crawler4j`**: Good for basic crawling, but often requires more boilerplate for "page requisite" handling and doesn't focus on preserving an *offline-viewable* structure.
+- **`Apache Nutch`**: Enterprise-grade, highly scalable (runs on Hadoop), but complex to set up and overkill for archiving small-to-medium sites or for embedding in a lightweight app.
+- **`WebMagic`**: Excellent for extraction (scraping), less focused on the "mirroring" aspect (downloading assets for offline use).
+
+## Why `jcrawler`? (Philosophy)
+
+You might ask: *"Is this just Not Invented Here syndrome? Why another crawler?"*
+
+`jcrawler` exists to fill a specific niche that the above tools miss:
+
+1.  **"Offline First" Mirroring**: Most crawlers are designed to *extract data* (text, prices, emails) to a database. `jcrawler` is designed to *extract the site itself* to a local folder, making it browsable offline exactly as it was online. This requires treating `srcset`, CSS `url()`, and redirects not just as "links to follow" but as "assets to localize".
+2.  **Fluent Java API**: We wanted a tool that feels like a modern Java stream API.
+    ```java
+    JCrawler.crawler().start("url").withFilter(...).crawl()
+    ```
+    Instead of XML configs (Nutch) or heavy class extensions (Crawler4j).
+3.  **Modern Web Ready**: Out-of-the-box support for `srcset`, deep linking, and identifying resources (PDFs, images) even behind redirects, without needing a full browser (Selenium/Playwright) for everything (though we aim to integrate that optionally).
+4.  **Embeddable**: It's a library first, CLI second. Meant to be dropped into your Java/Kotlin utility belt for tasks like "archive this documentation site" or "warm up this cache".
 
 ## Development
 

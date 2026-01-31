@@ -62,10 +62,11 @@ public class ParallelGraphTraverser<N> {
               // Queue was empty - check if all workers are idle and queue is still empty
               // Check BEFORE decrementing so we can detect all workers waiting
               log.debug("Worker {} poll timeout: idle={}/{} horizon={} horizonSet={}",
-                locali, idle, numberOfWorkerThreads, horizon.size(), horizonSet.size());
+                  locali, idle, numberOfWorkerThreads, horizon.size(), horizonSet.size());
               if (horizon.isEmpty() && horizonSet.isEmpty() && idle >= numberOfWorkerThreads) {
                 // All workers idle and no more work - terminate
-                log.info("Worker {} detected termination condition: queue empty, idle={}/{}", locali, idle, numberOfWorkerThreads);
+                log.debug("Worker {} detected termination condition: queue empty, idle={}/{}", locali, idle,
+                    numberOfWorkerThreads);
                 idleWorkers.decrementAndGet();
                 terminateAll();
                 break;
@@ -80,14 +81,14 @@ public class ParallelGraphTraverser<N> {
             }
             horizonSet.remove(current);
             if (maxDocs <= 0 || visited.size() < maxDocs) {
-              //process current node
+              // process current node
               if (visited.add(current)) {
-                log.info("Worker {} processing item, visited={} consumed={} maxDocs={}", locali, visited.size(),
-                  visitedCounter.get(), maxDocs);
+                log.debug("Worker {} processing item, visited={} consumed={} maxDocs={}", locali, visited.size(),
+                    visitedCounter.get(), maxDocs);
                 Iterable<? extends N> successors = null;
                 try {
                   successors = successorFunction.successors(current);
-                  log.info("Worker {} got {} successors", locali, successors != null ? "some" : "null");
+                  log.debug("Worker {} got {} successors", locali, successors != null ? "some" : "null");
                 } catch (Exception e) {
                   log.error("Worker {} exception getting successors: {}", locali, e.getMessage(), e);
                   successors = null;
@@ -102,9 +103,9 @@ public class ParallelGraphTraverser<N> {
                     }
                   }
                 }
-                log.info("Worker {} adding to visitedOrder", locali);
+                log.debug("Worker {} adding to visitedOrder", locali);
                 visitedOrder.add(current); // Add to order queue when visited
-                log.info("Worker {} added to visitedOrder, incrementing counter", locali);
+                log.debug("Worker {} added to visitedOrder, incrementing counter", locali);
                 if (maxDocs > 0 && visitedCounter.incrementAndGet() >= maxDocs) {
                   stopVisited();
                 }
@@ -113,10 +114,10 @@ public class ParallelGraphTraverser<N> {
                   break;
                 }
               } else {
-                log.info("Worker {} skipped item (already visited)", locali);
+                log.debug("Worker {} skipped item (already visited)", locali);
               }
             } else {
-              log.info("Worker {} skipped item (maxDocs reached)", locali);
+              log.debug("Worker {} skipped item (maxDocs reached)", locali);
             }
           }
           if (maxDocs > 0 && visitedOrder.size() >= maxDocs) {
@@ -125,8 +126,8 @@ public class ParallelGraphTraverser<N> {
         } catch (InterruptedException e) {
           log.debug("Interrupted during shutdown.", e);
         } finally {
-          log.info("Finished worker {} visited={} consumed={} maxDocs={}", locali, visited.size(),
-            visitedCounter.get(), maxDocs);
+          log.debug("Finished worker {} visited={} consumed={} maxDocs={}", locali, visited.size(),
+              visitedCounter.get(), maxDocs);
         }
       });
     }
@@ -134,9 +135,10 @@ public class ParallelGraphTraverser<N> {
   }
 
   private synchronized void terminateAll() {
-    if (terminated) return;
+    if (terminated)
+      return;
     terminated = true;
-    log.info("Terminating all workers and shutting down executor");
+    log.debug("Terminating all workers and shutting down executor");
     stopWorkers();
     stopVisited();
     // Shutdown executor to allow JVM to exit
@@ -162,59 +164,59 @@ public class ParallelGraphTraverser<N> {
   }
 
   private Iterable<N> topDown() {
-    return () -> new Iterator<>()
-      {
-        private N nextItem = null;
-        private boolean receivedStop = false;  // Track if we've received STOP
+    return () -> new Iterator<>() {
+      private N nextItem = null;
+      private boolean receivedStop = false; // Track if we've received STOP
 
-        @Override
-        public boolean hasNext() {
-          if (receivedStop) {
-            return false;  // Already ended, don't poll again
-          }
-          if (nextItem == null) {
-            try {
-              log.info("Iterator waiting for next item... visitedOrder.size={} terminated={}", visitedOrder.size(), terminated);
-              // Use poll with timeout instead of take to avoid infinite blocking
-              while (!terminated && !receivedStop) {
-                nextItem = visitedOrder.poll(500, TimeUnit.MILLISECONDS);
-                if (nextItem != null) {
-                  if (nextItem == STOP) {
-                    log.info("Iterator received STOP sentinel");
-                    receivedStop = true;
-                    nextItem = null;
-                    return false;
-                  }
-                  log.info("Iterator got item: {}", nextItem);
-                  break;
+      @Override
+      public boolean hasNext() {
+        if (receivedStop) {
+          return false; // Already ended, don't poll again
+        }
+        if (nextItem == null) {
+          try {
+            log.debug("Iterator waiting for next item... visitedOrder.size={} terminated={}", visitedOrder.size(),
+                terminated);
+            // Use poll with timeout instead of take to avoid infinite blocking
+            while (!terminated && !receivedStop) {
+              nextItem = visitedOrder.poll(500, TimeUnit.MILLISECONDS);
+              if (nextItem != null) {
+                if (nextItem == STOP) {
+                  log.debug("Iterator received STOP sentinel");
+                  receivedStop = true;
+                  nextItem = null;
+                  return false;
                 }
-                log.info("Iterator poll timeout, checking termination... terminated={}", terminated);
+                log.debug("Iterator got item: {}", nextItem);
+                break;
               }
-              // If terminated flag is set, end iteration
-              if (terminated) {
-                log.info("Iterator ending due to terminated flag");
-                receivedStop = true;
-                nextItem = null;
-              }
-            } catch (InterruptedException e) {
-              log.debug("Interrupted during shutdown.", e);
-              Thread.currentThread().interrupt();
-              return false;
+              log.debug("Iterator poll timeout, checking termination... terminated={}", terminated);
             }
+            // If terminated flag is set, end iteration
+            if (terminated) {
+              log.debug("Iterator ending due to terminated flag");
+              receivedStop = true;
+              nextItem = null;
+            }
+          } catch (InterruptedException e) {
+            log.debug("Interrupted during shutdown.", e);
+            Thread.currentThread().interrupt();
+            return false;
           }
-          return nextItem != null;
         }
+        return nextItem != null;
+      }
 
-        @Override
-        public N next() {
-          if (nextItem == null && !hasNext()) {
-            throw new NoSuchElementException();
-          }
-          N item = nextItem;
-          nextItem = null;
-          return item;
+      @Override
+      public N next() {
+        if (nextItem == null && !hasNext()) {
+          throw new NoSuchElementException();
         }
-      };
+        N item = nextItem;
+        nextItem = null;
+        return item;
+      }
+    };
   }
 
   public void shutdown() {

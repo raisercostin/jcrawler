@@ -53,6 +53,7 @@
 //SOURCES ParallelGraphTraverser.java
 //SOURCES RichPicocli.java
 //SOURCES Slug.java
+//SOURCES Rewriter.java
 //SOURCES ../../../com/namekis/utils/RichCli.java
 
 package org.raisercostin.jcrawler;
@@ -141,11 +142,9 @@ import com.namekis.utils.RichCli;
 @AllArgsConstructor
 @ToString
 @With
-@Command(name = "jcrawl", mixinStandardHelpOptions = true, version = "jcrawl 0.1",
-    description = "Crawler tool.",
-    //subcommands = GenerateCompletion.class,
-    usageHelpAutoWidth = true, usageHelpWidth = 120, showDefaultValues = true,
-    versionProvider = JCrawler.MyVersionProvider.class)
+@Command(name = "jcrawl", mixinStandardHelpOptions = true, version = "jcrawl 0.1", description = "Crawler tool.",
+    // subcommands = GenerateCompletion.class,
+    usageHelpAutoWidth = true, usageHelpWidth = 120, showDefaultValues = true, versionProvider = JCrawler.MyVersionProvider.class)
 @Slf4j
 public class JCrawler implements Callable<Integer> {
   /**
@@ -162,8 +161,28 @@ public class JCrawler implements Callable<Integer> {
     // --workdir: Base directory for operations
   }
 
+  public final java.util.Set<String> ignoredExternalDomains = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
   @ArgGroup(exclusive = false, heading = "Development options:%n", order = 100)
   StandardOptions standardOpts = new StandardOptions();
+
+  static class PathLocationConverter implements picocli.CommandLine.ITypeConverter<PathLocation> {
+    @Override
+    public PathLocation convert(String value) throws Exception {
+      return Locations.path(value);
+    }
+  }
+
+  static class RewriteOptions {
+    @picocli.CommandLine.Option(names = "--rewrite-inputs", split = ",", description = "Directories to rewrite")
+    java.util.List<String> inputs;
+
+    @picocli.CommandLine.Option(names = "--rewrite-output", description = "Output directory for rewrite")
+    String output;
+  }
+
+  @ArgGroup(exclusive = false, heading = "Rewrite options:%n", order = 200)
+  RewriteOptions rewriteOpts = new RewriteOptions();
 
   public static void main(String[] args) {
     // Use RichCli for mature logging configuration and error handling
@@ -174,9 +193,9 @@ public class JCrawler implements Callable<Integer> {
     main(split(args), exitAtEnd);
   }
 
-  private static void main(String[] args, boolean exitAtEnd) {
-    // Legacy main for backward compatibility
-    RichCli.main(args, () -> new JCrawler());
+  public static void main(String[] args, boolean exitAtEnd) {
+    // Use RichCli for mature logging configuration and error handling
+    RichCli.main(args, () -> new JCrawler(), exitAtEnd);
   }
 
   private static String[] split(String cmdWithSpaces) {
@@ -185,29 +204,40 @@ public class JCrawler implements Callable<Integer> {
     return tokenizer.getTokenArray();
   }
 
-  //  git.branch=master
-  //      git.build.host=DESKTOP-HO5N784
-  //      git.build.time=2024-06-12T20\:53\:44+0300
-  //      git.build.user.email=raisercostin@gmail.com
-  //      git.build.user.name=raisercostin
-  //      git.build.version=0.3-SNAPSHOT
-  //      git.closest.tag.commit.count=6
-  //      git.closest.tag.name=jcrawler-0.2
-  //      git.commit.id=3454d8ad006219cdd9a49f930a31975fab87b334
-  //      git.commit.id.abbrev=3454d8a
-  //      git.commit.id.describe=jcrawler-0.2-6-g3454d8a
-  //      git.commit.id.describe-short=jcrawler-0.2-6
-  //      git.commit.message.full=upgraded
-  //      git.commit.message.short=upgraded
-  //      git.commit.time=2024-06-12T20\:49\:24+0300
-  //      git.commit.user.email=raisercostin@gmail.com
-  //      git.commit.user.name=raisercostin
-  //      git.dirty=false
-  //      git.local.branch.ahead=0
-  //      git.local.branch.behind=0
-  //      git.remote.origin.url=https\://github.com/raisercostin/jcrawler.git
-  //      git.tags=
-  //      git.total.commit.count=94
+  // git.branch=master
+  // ... (keeping unchanged lines for context matching if needed, but
+  // replace_file_content replaces range)
+  // ...
+
+  // Skipping unrelated parts down to call() methods...
+  // I need to be careful with replace_file_content since I can't skip large
+  // chunks in ReplacementContent.
+  // I will split this into multiple chunks using multi_replace_file_content to be
+  // safer.
+
+  // git.branch=master
+  // git.build.host=DESKTOP-HO5N784
+  // git.build.time=2024-06-12T20\:53\:44+0300
+  // git.build.user.email=raisercostin@gmail.com
+  // git.build.user.name=raisercostin
+  // git.build.version=0.3-SNAPSHOT
+  // git.closest.tag.commit.count=6
+  // git.closest.tag.name=jcrawler-0.2
+  // git.commit.id=3454d8ad006219cdd9a49f930a31975fab87b334
+  // git.commit.id.abbrev=3454d8a
+  // git.commit.id.describe=jcrawler-0.2-6-g3454d8a
+  // git.commit.id.describe-short=jcrawler-0.2-6
+  // git.commit.message.full=upgraded
+  // git.commit.message.short=upgraded
+  // git.commit.time=2024-06-12T20\:49\:24+0300
+  // git.commit.user.email=raisercostin@gmail.com
+  // git.commit.user.name=raisercostin
+  // git.dirty=false
+  // git.local.branch.ahead=0
+  // git.local.branch.behind=0
+  // git.remote.origin.url=https\://github.com/raisercostin/jcrawler.git
+  // git.tags=
+  // git.total.commit.count=94
   @JsonNaming(PropertyNamingStrategies.LowerDotCaseStrategy.class)
   public static class GitInfo {
     public String gitBranch;
@@ -235,13 +265,13 @@ public class JCrawler implements Callable<Integer> {
     public String gitTags;
     public int gitTotalCommitCount;
     //
-    //    @JsonAnyGetter
-    //    private Map<String, Object> otherProperties = new HashMap<>();
+    // @JsonAnyGetter
+    // private Map<String, Object> otherProperties = new HashMap<>();
     //
-    //    @JsonAnySetter
-    //    public void setOtherProperty(String name, Object value) {
-    //      otherProperties.put(name, value);
-    //    }
+    // @JsonAnySetter
+    // public void setOtherProperty(String name, Object value) {
+    // otherProperties.put(name, value);
+    // }
   }
 
   static class MyVersionProvider implements IVersionProvider {
@@ -261,18 +291,18 @@ public class JCrawler implements Callable<Integer> {
       Properties properties = loadProperties("git.properties");
       ObjectMapper mapper = new ObjectMapper();
       GitInfo git = mapper.convertValue(properties, GitInfo.class);
-      //      GitInfo git = Nodes.hocon.toObject(
-      //        Locations.classpath("git.properties").readContent(),
-      //        GitInfo.class);
+      // GitInfo git = Nodes.hocon.toObject(
+      // Locations.classpath("git.properties").readContent(),
+      // GitInfo.class);
       // Return the version dynamically
       String version = """
           %s
           Build Time: %s
           Build User: %s (%s)""".formatted(
-        git.gitCommitIdDescribe,
-        git.gitBuildTime,
-        git.gitBuildUserName,
-        git.gitBuildUserEmail);
+          git.gitCommitIdDescribe,
+          git.gitBuildTime,
+          git.gitBuildUserName,
+          git.gitBuildUserEmail);
 
       return new String[] { version };
     }
@@ -285,17 +315,19 @@ public class JCrawler implements Callable<Integer> {
   public static JCrawler of(WebLocation webLocation, DirLocation cache,
       Option<ReadableFileLocation> whitelistSample) {
     Set<String> whitelist2 = whitelistSample
-      .map(x -> extractLinksFromContent(0, x.readContent(), null, null)
-        .map(z -> z.withoutQuery())
-        .toSet())
-      .getOrNull();
+        .map(x -> extractLinksFromContent(0, x.readContent(), null, null)
+            .map(z -> z.withoutQuery())
+            .toSet())
+        .getOrNull();
     Seq<String> urls = webLocation.ls().map(x -> x.asHttpClientLocation().toExternalForm()).toList();
     return of(cache, urls).withAdditionalAccepts(whitelist2);
   }
 
   private static JCrawler of(DirLocation projectDir, Seq<String> urls) {
-    JCrawler crawler = new JCrawler(new StandardOptions(), null, TraversalType.BREADTH_FIRST, Nodes.json, false, new PicocliDir(projectDir),
-      -1, 3, null, Duration.ofDays(100), null, null, 100, false, null, ContentStorage.decompressed, null, true)
+    JCrawler crawler = new JCrawler(new StandardOptions(), new RewriteOptions(), null, TraversalType.BREADTH_FIRST,
+        Nodes.json, false,
+        new PicocliDir(projectDir),
+        -1, 3, null, Duration.ofDays(100), null, null, 100, false, null, ContentStorage.decompressed, null, true)
         .withUrlsAndAccept(urls);
     return crawler;
   }
@@ -306,81 +338,95 @@ public class JCrawler implements Callable<Integer> {
     public final boolean hasUrl;
     public final boolean hasSrcSet;
     public final boolean hasDirective;
+    public final boolean isResource;
   }
 
   private static LinkMatcher exp(String sep) {
     Pattern pattern = Pattern.compile("(?i)(?s)<a[^>]*\\s+href=" + sep + "(?<url>[^" + sep + "#]*)(#[^" + sep + "]*)?"
         + sep + "[^>]*>(?<text>.*?)</a>");
-    return new LinkMatcher(pattern, true, false, false);
+    return new LinkMatcher(pattern, true, false, false, false);
   }
 
-  //regular expressions with named group consumes 17% of all time
-  //("href", "text")
+  // regular expressions with named group consumes 17% of all time
+  // ("href", "text")
   private static LinkMatcher urlInStyleExp() {
     Pattern pattern = Pattern.compile("(?i)url\\(['\"]?(?<url>[^'\")]+)['\"]?\\)");
-    return new LinkMatcher(pattern, true, false, false);
+    return new LinkMatcher(pattern, true, false, false, true);
   }
 
   private static LinkMatcher linkTagExp(String sep) {
     Pattern pattern = Pattern.compile("(?i)<link[^>]*\\s+href=" + sep + "(?<url>[^" + sep + "]*)" + sep + "[^>]*>");
-    return new LinkMatcher(pattern, true, false, false);
+    return new LinkMatcher(pattern, true, false, false, true);
   }
 
   private static LinkMatcher robotsTxtExp() {
     Pattern pattern = Pattern.compile("(?i)(?<directive>Sitemap|Allow|Disallow):\\s*(?<url>[^\\s]+)");
-    return new LinkMatcher(pattern, true, false, true);
+    return new LinkMatcher(pattern, true, false, true, true);
   }
 
   private static LinkMatcher imgExp(String sep) {
-    Pattern pattern = Pattern.compile("(?i)(?s)<img[^>]*\\s+src=" + sep + "(?<url>[^" + sep + "]*)" + sep
-        + "(?:[^>]*\\s+srcset=" + sep + "(?<srcset>[^" + sep + "]*)" + sep + ")?[^>]*>");
-    return new LinkMatcher(pattern, true, true, false);
+    Pattern pattern = Pattern
+        .compile("(?i)(?s)<img[^>]*\\s+src\\b\\s*=" + sep + "(?<url>[^" + sep + "]*)" + sep + "[^>]*>");
+    return new LinkMatcher(pattern, true, false, false, true);
   }
 
-  //script src=
+  private static LinkMatcher srcsetExp(String tag, String sep) {
+    Pattern pattern = Pattern
+        .compile("(?i)(?s)<" + tag + "[^>]*\\s+srcset\\b\\s*=" + sep + "(?<srcset>[^" + sep + "]*)" + sep + "[^>]*>");
+    // LinkMatcher(pattern, hasUrl, hasSrcSet, isRedirect, isResource)
+    // We set dummy url group if needed, or null
+    return new LinkMatcher(pattern, false, true, false, true);
+  }
+
+  // script src=
   private static LinkMatcher scriptSrc(String sep) {
     String tag = "script";
     String attribute = "src";
     Pattern pattern = Pattern
-      .compile("(?i)(?s)<" + tag + "[^>]*\\s+" + attribute + "=" + sep + "(?<url>[^" + sep + "]*)" + sep);
-    return new LinkMatcher(pattern, true, false, false);
+        .compile("(?i)(?s)<" + tag + "[^>]*\\s+" + attribute + "\\b\\s*=" + sep + "(?<url>[^" + sep + "]*)" + sep);
+    return new LinkMatcher(pattern, true, false, false, true);
   }
 
   private static LinkMatcher xmlStylesheetExp() {
-    Pattern pattern = Pattern.compile("(?i)<\\?xml-stylesheet[^>]*\\s+href=['\"](?<url>[^'\"]+)['\"][^>]*\\?>");
-    return new LinkMatcher(pattern, true, false, false);
+    Pattern pattern = Pattern.compile("(?i)<\\?xml-stylesheet[^>]*\\s+href\\b\\s*=['\"](?<url>[^'\"]+)['\"][^>]*\\?>");
+    return new LinkMatcher(pattern, true, false, false, true);
   }
 
   private static LinkMatcher sitemapLocExp() {
     Pattern pattern = Pattern.compile("(?i)<loc>(?<url>[^<]+)</loc>");
-    return new LinkMatcher(pattern, true, false, false);
+    return new LinkMatcher(pattern, true, false, false, true);
   }
 
   // Define all patterns using the LinkMatcher class
   private static final List<LinkMatcher> allLinkMatchers = List.of(
-    exp("'"),
-    exp("\\\""),
-    imgExp("'"),
-    imgExp("\\\""),
-    urlInStyleExp(),
-    linkTagExp("'"),
-    linkTagExp("\\\""),
-    robotsTxtExp(),
-    xmlStylesheetExp(),
-    sitemapLocExp(),
-    scriptSrc("\\\""),
-    scriptSrc("'")
-  //
-  );
+      exp("'"),
+      exp("\\\""),
+      imgExp("'"),
+      imgExp("\\\""),
+      srcsetExp("img", "'"),
+      srcsetExp("img", "\\\""),
+      srcsetExp("source", "'"),
+      srcsetExp("source", "\\\""),
+      urlInStyleExp(),
+      linkTagExp("'"),
+      linkTagExp("\\\""),
+      robotsTxtExp(),
+      xmlStylesheetExp(),
+      sitemapLocExp(),
+      scriptSrc("\\\""),
+      scriptSrc("'"));
 
   // The extractor logic
   static io.vavr.collection.Iterator<HyperLink> extractLinksFromContent(int depth, final String content,
       String source, String sourceUrl) {
+    if (log.isDebugEnabled()) {
+      log.debug("extractLinksFromContent depth={} sourceUrl={} contentLength={}", depth, sourceUrl, content.length());
+    }
     io.vavr.collection.Iterator<HyperLink> result;
     result = allLinkMatchers.iterator().flatMap(linkMatcher -> {
       Matcher matcher = linkMatcher.pattern.matcher(content);
       io.vavr.collection.Iterator<Matcher> allMatches = io.vavr.collection.Iterator.continually(matcher)
-        .takeWhile(m -> m.find());
+          .takeWhile(m -> m.find());
 
       return allMatches.flatMap(m -> {
         String url = linkMatcher.hasUrl ? m.group("url").trim() : null;
@@ -388,25 +434,66 @@ public class JCrawler implements Callable<Integer> {
             : null;
         String srcset = linkMatcher.hasSrcSet && m.group("srcset") != null ? m.group("srcset").trim() : "";
 
-        if (url == null) {
+        if (url == null && srcset.isEmpty()) {
           return io.vavr.collection.List.<HyperLink>empty().iterator();
         }
 
         // Create iterator for src and all srcset entries
-        io.vavr.collection.List<HyperLink> links = io.vavr.collection.List
-          .of(HyperLink.of(url, depth, directive != null ? directive : "", null, m.group().trim(), sourceUrl, source));
+        boolean isResource = linkMatcher.isResource;
+        if (!isResource && url != null) {
+          String lower = url.toLowerCase();
+          if (lower.endsWith(".pdf") || lower.endsWith(".zip") || lower.endsWith(".mp3") || lower.endsWith(".avi")
+              || lower.endsWith(".jpg") || lower.endsWith(".png") || lower.endsWith(".css") || lower.endsWith(".js")) {
+            isResource = true;
+          }
+        }
+        io.vavr.collection.List<HyperLink> links = io.vavr.collection.List.empty();
+        if (url != null) {
+          links = links.append(HyperLink.of(url, depth, directive != null ? directive : "", null, m.group().trim(),
+              sourceUrl, source, false, isResource));
+        }
 
         if (!srcset.isEmpty()) {
-          // Split srcset by URLs followed by space, number, and 'w' or 'x'
-          Pattern srcsetPattern = Pattern.compile("([^\\s]+)\\s*(\\d+(?:w|x))(?=,|$),?");
-          Matcher srcsetMatcher = srcsetPattern.matcher(srcset);
+          // Heuristic Splitter:
+          // 1. Split if comma is preceded by a descriptor (e.g., " 1x", " 200w").
+          // Pattern: (?<=\s\d{1,5}[wx])\s*,\s+
+          // 2. Split if comma is followed by an absolute URL or root path.
+          // Pattern: ,\s+(?=(?:https?://|/))
 
-          while (srcsetMatcher.find()) {
-            String srcsetUrl = srcsetMatcher.group(1).trim(); // The URL part
-            String descriptor = srcsetMatcher.groupCount() >= 2 && srcsetMatcher.group(2) != null
-                ? srcsetMatcher.group(2).trim()
-                : ""; // Width or density descriptor (e.g., "1366w" or "2x")
-            links = links.append(HyperLink.of(srcsetUrl, depth, descriptor, null, m.group().trim(), sourceUrl, source));
+          String splitRegex = "(?<=\\s\\d{1,5}(?:\\.\\d+)?[wx])\\s*,\\s+|" +
+              ",\\s+(?=(?:https?://|/))";
+          Pattern splitPattern = Pattern.compile(splitRegex);
+          Matcher splitMatcher = splitPattern.matcher(srcset);
+          io.vavr.collection.List<String> srcsetEntries = io.vavr.collection.List.empty();
+
+          int lastEnd = 0;
+          while (splitMatcher.find()) {
+            srcsetEntries = srcsetEntries.append(srcset.substring(lastEnd, splitMatcher.start()));
+            lastEnd = splitMatcher.end();
+          }
+          // Add the final entry
+          srcsetEntries = srcsetEntries.append(srcset.substring(lastEnd));
+
+          for (String entry : srcsetEntries) {
+            entry = entry.trim();
+            if (entry.isEmpty()) {
+              continue;
+            }
+
+            // Split by last space to separate URL from descriptor (e.g., "1x", "2x",
+            // "100w")
+            int lastSpace = entry.lastIndexOf(' ');
+            if (lastSpace > 0) {
+              String srcsetUrl = entry.substring(0, lastSpace).trim();
+              String descriptor = entry.substring(lastSpace + 1).trim();
+
+              // Remove spaces that Jsoup added within the URL (e.g., "w_263, h_189" ->
+              // "w_263,h_189")
+              srcsetUrl = srcsetUrl.replaceAll("\\s+", "");
+
+              links = links.append(HyperLink.of(srcsetUrl, depth, descriptor, null, m.group().trim(), sourceUrl, source,
+                  false, isResource));
+            }
           }
         }
 
@@ -426,7 +513,7 @@ public class JCrawler implements Callable<Integer> {
     BREADTH_FIRST {
       @Override
       public <N> Iterable<N> traverse(JCrawler config, Iterable<N> todo, SuccessorsFunction<N> successor) {
-        //TODO bug in guava traversal that checks all initial links twice
+        // TODO bug in guava traversal that checks all initial links twice
         return Traverser.forGraph(successor).breadthFirst(todo);
       }
     },
@@ -449,59 +536,58 @@ public class JCrawler implements Callable<Integer> {
   @Spec
   @JsonIgnore
   private CommandSpec spec; // injected by picocli
-  @picocli.CommandLine.Option(names = { "-t", "--traversal" },
-      description = "Set the traversal mode: ${COMPLETION-CANDIDATES}.")
+  @picocli.CommandLine.Option(names = { "-t",
+      "--traversal" }, description = "Set the traversal mode: ${COMPLETION-CANDIDATES}.")
   public TraversalType traversalType = TraversalType.PARALLEL_BREADTH_FIRST;
   @JsonIgnore
   public JacksonNodes linksNodes = Nodes.json;
   @picocli.CommandLine.Option(names = { "--recomputeLinks" }, description = "Extract links again from content")
   public boolean recomputeLinks = false;
 
-  @picocli.CommandLine.Option(names = { "-p", "--project" },
-      description = "Project dir for config and crawled content.",
-      converter = LocationConverter.class)
+  @picocli.CommandLine.Option(names = { "-p",
+      "--project" }, description = "Project dir for config and crawled content.", converter = LocationConverter.class)
   public PicocliDir projectDir = new PicocliDir(Locations.current().child(".jcrawler"));
   @picocli.CommandLine.Option(names = { "-d", "--maxDocs" })
   public int maxDocs = 10_000;
   @picocli.CommandLine.Option(names = { "-c", "--maxConnections" })
   public int maxConnections = 3;
-  @picocli.CommandLine.Option(names = { "--protocol" },
-      description = "Set the protocol: ${COMPLETION-CANDIDATES}.")
+  @picocli.CommandLine.Option(names = { "--protocol" }, description = "Set the protocol: ${COMPLETION-CANDIDATES}.")
   public HttpProtocol[] protocols = { HttpProtocol.H2, HttpProtocol.HTTP11 };
-  @picocli.CommandLine.Option(names = { "--expire" },
-      description = "Expiration as a iso 8601 format like P1DT1S. \n Full format P(n)Y(n)M(n)DT(n)H(n)M(n)S\nSee more at https://www.digi.com/resources/documentation/digidocs/90001488-13/reference/r_iso_8601_duration_format.htm")
+  @picocli.CommandLine.Option(names = {
+      "--expire" }, description = "Expiration as a iso 8601 format like P1DT1S. \n Full format P(n)Y(n)M(n)DT(n)H(n)M(n)S\nSee more at https://www.digi.com/resources/documentation/digidocs/90001488-13/reference/r_iso_8601_duration_format.htm")
   public Duration cacheExpiryDuration = Duration.ofDays(100);
-  @picocli.CommandLine.Parameters(paramLabel = "urls",
-      description = """
-          Urls to crawl. If urls contain expressions all combinations of that values will be generated:
-          - ranges like {start-end}
-          - alternatives like {option1|option2|option3}
+  @picocli.CommandLine.Parameters(paramLabel = "urls", description = """
+      Urls to crawl. If urls contain expressions all combinations of that values will be generated:
+      - ranges like {start-end}
+      - alternatives like {option1|option2|option3}
 
-          For example https://namekis.com/{docA|doc2}/{1-3} will generate the following urls:
-          - https://namekis.com/docA/1
-          - https://namekis.com/docA/2
-          - https://namekis.com/docA/3
-          - https://namekis.com/doc2/1
-          - https://namekis.com/doc2/2
-          - https://namekis.com/doc2/3""", converter = VavrConverter.class)
+      For example https://namekis.com/{docA|doc2}/{1-3} will generate the following urls:
+      - https://namekis.com/docA/1
+      - https://namekis.com/docA/2
+      - https://namekis.com/docA/3
+      - https://namekis.com/doc2/1
+      - https://namekis.com/doc2/2
+      - https://namekis.com/doc2/3""", converter = VavrConverter.class, arity = "0..*")
   @With(value = AccessLevel.PRIVATE)
   public Seq<String> urls;
   @picocli.CommandLine.Option(names = { "--accept" }, description = "Additional urls to accept.")
-  public Set<String> accept;
-  @picocli.CommandLine.Option(names = { "-l", "--level" },
-      description = "Limit depth crawling. Given start urls are level 0. All different links from it are level 1.")
+  public java.util.List<String> accept;
+  @picocli.CommandLine.Option(names = { "-l",
+      "--level" }, description = "Limit depth crawling. Given start urls are level 0. All different links from it are level 1.")
   public int depth = 100;
   @picocli.CommandLine.Option(names = { "--show-stacktrace" }, description = "Show stack trace on errors")
   public boolean debug = false;
   @picocli.CommandLine.Option(names = { "--acceptHostname" }, description = "Template to accept urls with this prefix.")
   public String acceptHostname = "{http|https}://{www.|}%s";
+
   public enum ContentStorage {
     decompressed,
     compressed,
     both
   }
 
-  @picocli.CommandLine.Option(names = { "--content-storage" }, description = "How to store content: ${COMPLETION-CANDIDATES}.")
+  @picocli.CommandLine.Option(names = {
+      "--content-storage" }, description = "How to store content: ${COMPLETION-CANDIDATES}.")
   public ContentStorage contentStorage = ContentStorage.decompressed;
   public String crawlFormat = "";
   @picocli.CommandLine.Option(names = { "--migrate" }, description = "Migrate takes time to re-read metadata")
@@ -512,23 +598,61 @@ public class JCrawler implements Callable<Integer> {
 
   @Override
   public Integer call() throws Exception {
-    //CommandLine.Help help = new CommandLine.Help(spec);
-    //System.out.println(help.optionList());
-    crawlIterator().forEach(x -> System.out.println(x.externalForm + " => " + x.localCache));
+    if (rewriteOpts.inputs != null && !rewriteOpts.inputs.isEmpty()) {
+      if (rewriteOpts.output == null) {
+        System.err.println("Error: --rewrite-output is required when --rewrite-inputs is specified.");
+        return 1;
+      }
+      new Rewriter().run(rewriteOpts.inputs.stream().map(x -> Locations.path(x)).toList(),
+          Locations.path(rewriteOpts.output));
+      return 0;
+    }
+    // CommandLine.Help help = new CommandLine.Help(spec);
+    // System.out.println(help.optionList());
+    // crawlIterator().forEach(x -> System.out.println(x.externalForm + " => " +
+    // x.localCache));
+    var result = crawlIterator().toList();
+    result.forEach(x -> log.debug("{} => {}", x.externalForm, x.localCache));
+
+    if (!ignoredExternalDomains.isEmpty()) {
+      System.out.println("\n--------------------------------------------------------------");
+      System.out.println("Suggestion: The following external domains were encountered:");
+      ignoredExternalDomains.stream().sorted().forEach(domain -> System.out.println("  - " + domain));
+      System.out.println("\nTo include them in the crawl, add the following arguments:");
+
+      String acceptArgs = ignoredExternalDomains.stream()
+          .sorted()
+          .map(domain -> "--accept " + domain)
+          .collect(java.util.stream.Collectors.joining(" "));
+      System.out.println(acceptArgs);
+      System.out.println("--------------------------------------------------------------\n");
+    }
+
+    // Write full result to .crawl-result.yaml
+    java.util.Map<String, Object> finalResult = new java.util.LinkedHashMap<>();
+    finalResult.put("config", this);
+    finalResult.put("ignoredExternalDomains", ignoredExternalDomains);
+    finalResult.put("stats", java.util.Map.of("totalLinks", result.size()));
+
+    projectDir.dir.child(".crawl-result.yaml")
+        .asWritableFile()
+        .write(Nodes.yml.toString(finalResult));
+
     return 0;
   }
 
   public RichIterable<HyperLink> crawlIterator() {
-    log.info("JCrawler started with config:\n{}", Nodes.yml.toString(this));
+    log.debug("JCrawler started with config:\n{}", Nodes.yml.toString(this));
     CrawlerWorker worker = worker();
-    projectDir.dir.child(".crawl-config.yaml")
-      .asWritableFile()
-      .nonExistingOrElse(x -> x.delete(DeleteOptions.deleteDefault()))
-      //.deleteFile(((SimpleDeleteOptions) DeleteOptions.deleteDefault()).withIgnoreNonExisting(true))
-      .asWritableFile()
-      .write(Nodes.yml.toString(worker));
+    // projectDir.dir.child(".crawl-config.yaml")
+    // .asWritableFile()
+    // .nonExistingOrElse(x -> x.delete(DeleteOptions.deleteDefault()))
+    // // .deleteFile(((SimpleDeleteOptions)
+    // // DeleteOptions.deleteDefault()).withIgnoreNonExisting(true))
+    // .asWritableFile()
+    // .write(Nodes.yml.toString(worker));
     return worker.crawl(
-      urls.flatMap(generator -> Generators.parse(generator).generate()).map(x -> HyperLink.of(x)));
+        urls.flatMap(generator -> Generators.parse(generator).generate()).map(x -> HyperLink.of(x)));
   }
 
   public CrawlerWorker worker() {
@@ -568,7 +692,7 @@ public class JCrawler implements Callable<Integer> {
   }
 
   public JCrawler withFiltersByPrefix(String... filters) {
-    return withAccept(API.Set(filters));
+    return withAccept(java.util.Arrays.asList(filters));
   }
 
   public JCrawler withVerbosity(int level) {
@@ -587,62 +711,70 @@ public class JCrawler implements Callable<Integer> {
     // Check for both .html and .html.gz existence when checking modification time
     ReferenceLocation metaJson = dest.meta("", ".meta.json");
     if (metaJson.exists()) {
-        try {
-            Metadata m = Nodes.json.toObject(metaJson.asReadableFile().readContent(), Metadata.class);
-            String encoding = getEncoding(m);
-            String ext = getExtensionForEncoding(encoding);
-            ReferenceLocation physical = ext.isEmpty() ? dest : dest.parentRef().get().child(dest.filename() + ext);
-            if (physical.exists()) {
-                return physical.modifiedDateTime().toInstant().isBefore(Instant.now().minus(cacheExpiryDuration));
-            }
-        } catch (Exception e) {
-            log.warn("Error reading metadata for forceDownload check: {}. Enable trace for full stacktrace.", e.toString());
-            log.trace("Error reading metadata for forceDownload check", e);
-            // Fallback to basic check below
+      try {
+        Metadata m = Nodes.json.toObject(metaJson.asReadableFile().readContent(), Metadata.class);
+        String encoding = getEncoding(m);
+        String ext = getExtensionForEncoding(encoding);
+        ReferenceLocation physical = ext.isEmpty() ? dest : dest.parentRef().get().child(dest.filename() + ext);
+        if (physical.exists()) {
+          return physical.modifiedDateTime().toInstant().isBefore(Instant.now().minus(cacheExpiryDuration));
         }
+      } catch (Exception e) {
+        log.warn("Error reading metadata for forceDownload check: {}. Enable trace for full stacktrace.", e.toString());
+        log.trace("Error reading metadata for forceDownload check", e);
+        // Fallback to basic check below
+      }
     }
     if (!dest.exists()) {
-       // If no metadata and no file, force download
-       return true;
+      // If no metadata and no file, force download
+      return true;
     }
     return dest.modifiedDateTime().toInstant().isBefore(Instant.now().minus(cacheExpiryDuration));
   }
 
   public static InputStream decompressStream(String encoding, InputStream in) throws IOException {
-      if ("gzip".equalsIgnoreCase(encoding)) {
-          return new java.util.zip.GZIPInputStream(in);
-      } else if ("deflate".equalsIgnoreCase(encoding)) {
-          return new java.util.zip.InflaterInputStream(in);
-      } else if ("br".equalsIgnoreCase(encoding)) {
-          return new BrotliInputStream(in);
-      } else if ("zstd".equalsIgnoreCase(encoding)) {
-          return new ZstdInputStream(in);
-      }
-      return in;
+    if ("gzip".equalsIgnoreCase(encoding)) {
+      return new java.util.zip.GZIPInputStream(in);
+    } else if ("deflate".equalsIgnoreCase(encoding)) {
+      return new java.util.zip.InflaterInputStream(in);
+    } else if ("br".equalsIgnoreCase(encoding)) {
+      return new BrotliInputStream(in);
+    } else if ("zstd".equalsIgnoreCase(encoding)) {
+      return new ZstdInputStream(in);
+    }
+    return in;
   }
 
   public static String getExtensionForEncoding(String encoding) {
-      if ("gzip".equalsIgnoreCase(encoding)) return ".gz";
-      if ("br".equalsIgnoreCase(encoding)) return ".br";
-      if ("zstd".equalsIgnoreCase(encoding)) return ".zst";
-      return "";
+    if ("gzip".equalsIgnoreCase(encoding))
+      return ".gz";
+    if ("br".equalsIgnoreCase(encoding))
+      return ".br";
+    if ("zstd".equalsIgnoreCase(encoding))
+      return ".zst";
+    return "";
   }
 
   public static String getEncodingFromExtension(String ext) {
-      if (".gz".equalsIgnoreCase(ext)) return "gzip";
-      if (".br".equalsIgnoreCase(ext)) return "br";
-      if (".zst".equalsIgnoreCase(ext)) return "zstd";
-      return "";
+    if (".gz".equalsIgnoreCase(ext))
+      return "gzip";
+    if (".br".equalsIgnoreCase(ext))
+      return "br";
+    if (".zst".equalsIgnoreCase(ext))
+      return "zstd";
+    return "";
   }
 
   public static boolean isSame(ReferenceLocation loc1, ReferenceLocation loc2) {
-      if (loc1 == null || loc2 == null) return false;
-      return loc1.absoluteAndNormalized().equalsIgnoreCase(loc2.absoluteAndNormalized());
+    if (loc1 == null || loc2 == null)
+      return false;
+    return loc1.absoluteAndNormalized().equalsIgnoreCase(loc2.absoluteAndNormalized());
   }
 
   public static String getEncoding(Metadata meta) {
-      if (meta == null || meta.responseHeaders == null) return null;
-      return meta.responseHeaders.getFirst("Content-Encoding");
+    if (meta == null || meta.responseHeaders == null)
+      return null;
+    return meta.responseHeaders.getFirst("Content-Encoding");
   }
 
   public JCrawler withProjectPath(PathLocation dir) {
@@ -661,64 +793,110 @@ public class JCrawler implements Callable<Integer> {
     return withUrls(urls);
   }
 
-  private JCrawler withAdditionalAccepts(Set<String> additionalAccept) {
-    return withAccept(this.accept.addAll(additionalAccept));
+  private JCrawler withAdditionalAccepts(Iterable<String> additionalAccept) {
+    if (this.accept == null) {
+      java.util.List<String> newAccept = new java.util.ArrayList<>();
+      additionalAccept.forEach(newAccept::add);
+      return withAccept(newAccept);
+    }
+    java.util.List<String> newAccept = new java.util.ArrayList<>(this.accept);
+    additionalAccept.forEach(newAccept::add);
+    return withAccept(newAccept);
   }
 
   public static class CrawlerWorker {
     public final JCrawler config;
     @JsonIgnore
     public final WebClientFactory client;
-    //public final java.util.concurrent.Semaphore semaphore;
+    // public final java.util.concurrent.Semaphore semaphore;
     @JsonIgnore
     public final BlockingQueue<String> tokenQueue;
     @JsonIgnore
     public final Cache<String, String> failingServers = CacheBuilder.newBuilder()
-      .expireAfterWrite(10, TimeUnit.MINUTES)
-      .build();
+        .expireAfterWrite(10, TimeUnit.MINUTES)
+        .build();
     private Set<String> accept;
 
     public CrawlerWorker(JCrawler config) {
-      //config.verbosity.configureLoggingLevel();
+      // config.verbosity.configureLoggingLevel();
       this.config = config;
       this.accept = config.urls != null ? config.urls.iterator()
-        .map(
-          x -> config.acceptHostname.formatted(HyperLink.of(x).hostnameForAccept()))
-        .toSet()
-        .addAll(config.accept != null ? config.accept : Collections.emptySet())
-        .flatMap(x -> Generators.generate(x)) : API.Set();
+          .map(
+              x -> config.acceptHostname.formatted(HyperLink.of(x).hostnameForAccept()))
+          .toSet()
+          .toSet()
+          .addAll(config.accept != null ? io.vavr.collection.List.ofAll(config.accept).map(acc -> {
+            if (acc.startsWith("http") || acc.contains("{")) {
+              return acc;
+            }
+            return config.acceptHostname.formatted(acc);
+          }) : API.Set())
+          .flatMap(x -> Generators.generate(x)) : API.Set();
       this.client = new WebClientFactory("jcrawler", config.protocols);
-      //this.semaphore = new Semaphore(config.maxConnections);
+      // this.semaphore = new Semaphore(config.maxConnections);
       this.tokenQueue = new ArrayBlockingQueue<>(config.maxConnections);
 
-      //Populate the queue with tokens
+      // Populate the queue with tokens
       for (int i = 0; i < config.maxConnections; i++) {
         tokenQueue.add("c" + i);
       }
-      log.info("Accepts:\n - {}", accept.mkString("\n - "));
+      log.debug("Accepts:\n - {}", accept.mkString("\n - "));
     }
 
     private RichIterable<HyperLink> crawl(Traversable<HyperLink> todo) {
       Iterable<HyperLink> all = config.traversalType.traverse(config, todo, this::downloadAndExtractLinks);
       return RichIterable.ofAll(all)
-        .take(config.maxDocs);
+          .take(config.maxDocs);
     }
 
-    private boolean accept(HyperLink link) {
+    // Visible for testing
+    boolean accept(HyperLink link) {
       boolean accept = accept2(link);
-      if (!accept && link.isRedirect) {
-          log.warn("Redirect target ignored by accept filter: [{}]. If this content is needed, add the domain to --accept.", link.externalForm);
+      if (!accept) {
+        if (link.depth <= config.depth) {
+          String url = link.externalForm.toLowerCase();
+          boolean unsupported = false;
+          for (String protocol : UNSUPPORTED_PROTOCOLS) {
+            if (url.startsWith(protocol)) {
+              unsupported = true;
+              break;
+            }
+          }
+          if (!unsupported) {
+            String host = link.hostname();
+            if (host != null && !host.isEmpty()) {
+              config.ignoredExternalDomains.add(host);
+            }
+          }
+        }
+        if (link.isRedirect) {
+          log.warn(
+              "Redirect target ignored by accept filter: [{}]. If this content is needed, add the domain to --accept.",
+              link.externalForm);
+        }
       }
       log.debug("{} [{}]", accept ? "accept" : "ignore", link.externalForm);
       return accept;
     }
 
     private static final java.util.Set<String> UNSUPPORTED_PROTOCOLS = java.util.Set.of(
-      "tel:", "mailto:", "javascript:", "data:", "blob:", "file:", "ftp:", "ssh:", "git:");
+        "tel:", "mailto:", "javascript:", "data:", "blob:", "file:", "ftp:", "ssh:", "git:");
 
     private boolean accept2(HyperLink link) {
       if (link.depth > config.depth) {
         return false;
+      }
+      // Requisites/Resources (images, scripts, etc.) are always accepted to ensure
+      // the page renders correctly
+      // This mimics "page requisites" behavior of wget/browsers
+      if (link.isResource) {
+        return true;
+      }
+      // Use implicit ownership: if we accepted the source link (which lead to this
+      // redirect), we should accept the target.
+      // E.g. internal link -> 301 -> external link.
+      if (link.isRedirect) {
+        return true;
       }
       if (accept == null) {
         return false;
@@ -759,7 +937,7 @@ public class JCrawler implements Callable<Integer> {
         return API.Seq();
       }
       String hostname = href.hostname();
-      if (failingServers.getIfPresent(hostname) != null) {
+      if (hostname != null && failingServers.getIfPresent(hostname) != null) {
         log.debug("ignored failing server for a while [{}]", href.externalForm);
         return API.Seq();
       }
@@ -771,109 +949,117 @@ public class JCrawler implements Callable<Integer> {
 
       var destFromSymlink = contentUid.existingRef().map(x -> x.userSymlinkTarget());
       var metaJson2 = destFromSymlink.map(x -> x.meta("", ".meta.json"));
-      
-            // Check for existence considering compressed variant too
-            boolean destExists = destFromSymlink.map(x -> {
-                if (x.exists()) return true;
-                // Use metadata to check for compressed existence
-                ReferenceLocation mj = x.meta("", ".meta.json");
-                if (mj.exists()) {
-                     try {
-                         Metadata m = Nodes.json.toObject(mj.asReadableFile().readContent(), Metadata.class);
-                         String ext = getExtensionForEncoding(getEncoding(m));
-                         return !ext.isEmpty() && x.parentRef().get().child(x.filename() + ext).exists();
-                     } catch(Exception e) {
-                         log.debug("Ignored error checking metadata existence for {}: {}. Enable trace for details.", mj, e.toString());
-                         log.trace("Ignored error checking metadata existence", e);
-                         return false; 
-                     }
+
+      // Check for existence considering compressed variant too
+      boolean destExists = destFromSymlink.map(x -> {
+        if (x.exists())
+          return true;
+        // Use metadata to check for compressed existence
+        ReferenceLocation mj = x.meta("", ".meta.json");
+        if (mj.exists()) {
+          try {
+            Metadata m = Nodes.json.toObject(mj.asReadableFile().readContent(), Metadata.class);
+            String ext = getExtensionForEncoding(getEncoding(m));
+            return !ext.isEmpty() && x.parentRef().get().child(x.filename() + ext).exists();
+          } catch (Exception e) {
+            log.debug("Ignored error checking metadata existence for {}: {}. Enable trace for details.", mj,
+                e.toString());
+            log.trace("Ignored error checking metadata existence", e);
+            return false;
+          }
+        }
+        return false;
+      }).getOrElse(false);
+      boolean exists = contentUid.exists() && /* contentUid.isSymlink() && */ destExists
+          && metaJson2.get().exists();
+      // WritableFileLocation old = config.findOldFile(href);
+      // WritableFileLocation dest = config.cached(href).asWritableFile();
+      // // try {
+      // if (old.exists()) {
+      // old.rename(dest);
+      // old.meta("", ".meta.json").asPathLocation().rename(dest.meta("",
+      // ".meta.json").asPathLocation());
+      // old.meta("", ".links.json").asPathLocation().rename(dest.meta("",
+      // ".links.json").asPathLocation());
+      // }
+      boolean forcedDownload = exists && config.forceDownload(href, contentUid.asWritableFile());
+      if (!exists || forcedDownload) {
+        String token = tokenQueue.take();
+        // semaphore.acquire();
+        // int available = counter.incrementAndGet();
+        try {
+          // check writing before downloading
+          destInitial.write("").deleteFile(DeleteOptions.deletePermanent());
+          log.debug("download from url #{} [{}]", token, href.externalForm);
+          try {
+            String url = href.externalForm;
+            RequestResponse content = download(href, destInitial);
+            metadata = content.getMetadata();
+            metadata.addField("crawler.slug", href.slug());
+            dest = config.cached(Slug.contentPathFinal(href.externalForm, metadata)).asWritableFile();
+            contentUid.asPathLocation().deleteFile(DeleteOptions.deleteByRenameOption().withIgnoreNonExisting(true));
+            // Adjust userSymlinkTo to point to the canonical file name (without .gz), even
+            // if physical file is .gz?
+            // Symlink usually points to existing file.
+            // If we only store compressed, dest (without .gz) doesn't exist.
+            // So we might need to point to dest + ".gz" if that's what we kept.
+
+            WritableFileLocation finalDest = dest;
+            if (config.contentStorage == ContentStorage.compressed && !dest.exists()) {
+              String ext = getExtensionForEncoding(getEncoding(metadata));
+              if (!ext.isEmpty()) {
+                WritableFileLocation compDest = dest.parentRef().get().child(dest.filename() + ext).asWritableFile();
+                if (compDest.exists()) {
+                  finalDest = compDest;
                 }
-                return false;
-            }).getOrElse(false);
-            boolean exists = contentUid.exists() && /* contentUid.isSymlink() && */ destExists
-                && metaJson2.get().exists();
-            //      WritableFileLocation old = config.findOldFile(href);
-            //      WritableFileLocation dest = config.cached(href).asWritableFile();
-            //      //      try {
-            //      if (old.exists()) {
-            //        old.rename(dest);
-            //        old.meta("", ".meta.json").asPathLocation().rename(dest.meta("", ".meta.json").asPathLocation());
-            //        old.meta("", ".links.json").asPathLocation().rename(dest.meta("", ".links.json").asPathLocation());
-            //      }
-            boolean forcedDownload = exists && config.forceDownload(href, contentUid.asWritableFile());
-            if (!exists || forcedDownload) {
-              String token = tokenQueue.take();
-              //semaphore.acquire();
-              //int available = counter.incrementAndGet();
-              try {
-                //check writing before downloading
-                destInitial.write("").deleteFile(DeleteOptions.deletePermanent());
-                log.debug("download from url #{} [{}]", token, href.externalForm);
-                try {
-                  String url = href.externalForm;
-                  RequestResponse content = download(url, destInitial);
-                  metadata = content.getMetadata();
-                  metadata.addField("crawler.slug", href.slug());
-                  dest = config.cached(Slug.contentPathFinal(href.externalForm, metadata)).asWritableFile();
-                  contentUid.asPathLocation().deleteFile(DeleteOptions.deleteByRenameOption().withIgnoreNonExisting(true));
-                  // Adjust userSymlinkTo to point to the canonical file name (without .gz), even if physical file is .gz?
-                  // Symlink usually points to existing file.
-                  // If we only store compressed, dest (without .gz) doesn't exist.
-                  // So we might need to point to dest + ".gz" if that's what we kept.
-      
-                  WritableFileLocation finalDest = dest;
-                  if (config.contentStorage == ContentStorage.compressed && !dest.exists()) {
-                       String ext = getExtensionForEncoding(getEncoding(metadata));
-                       if (!ext.isEmpty()) {
-                           WritableFileLocation compDest = dest.parentRef().get().child(dest.filename() + ext).asWritableFile();
-                           if (compDest.exists()) {
-                               finalDest = compDest;
-                           }
-                       }
-                  }
-      
-                  contentUid.userSymlinkTo(finalDest);            // Rename logic needs to handle .gz, .br, .zst
+              }
+            }
+
+            contentUid.userSymlinkTo(finalDest); // Rename logic needs to handle .gz, .br, .zst
             if (destInitial.exists()) {
-                if (!isSame(destInitial, dest)) {
-                    destInitial.rename(dest.backupIfExists());
-                }
-            } 
-            
+              if (!isSame(destInitial, dest)) {
+                destInitial.rename(dest.backupIfExists());
+              }
+            }
+
             String ext = getExtensionForEncoding(getEncoding(metadata));
             if (!ext.isEmpty()) {
-                ReferenceLocation compInitial = destInitial.parentRef().get().child(destInitial.filename() + ext);
-                if (compInitial.exists()) {
-                    ReferenceLocation compDest = dest.parentRef().get().child(dest.filename() + ext);
-                    if (!isSame(compInitial, compDest)) {
-                        compInitial.asWritableFile().rename(compDest.asWritableFile().backupIfExists());
-                    }
+              ReferenceLocation compInitial = destInitial.parentRef().get().child(destInitial.filename() + ext);
+              if (compInitial.exists()) {
+                ReferenceLocation compDest = dest.parentRef().get().child(dest.filename() + ext);
+                if (!isSame(compInitial, compDest)) {
+                  compInitial.asWritableFile().rename(compDest.asWritableFile().backupIfExists());
                 }
+              }
             }
-            
+
             ReferenceLocation metaJson = dest.meta("", ".meta.json");
-            //dest.touch();
-            //metaJson.asPathLocation().write("").deleteFile(DeleteOptions.deletePermanent());
+            // dest.touch();
+            // metaJson.asPathLocation().write("").deleteFile(DeleteOptions.deletePermanent());
             metaJson.asPathLocation().write(content.computeMetadata(metadata));
           } catch (Exception e) {
             String rootMessage = Throwables.getRootCause(e).getMessage();
             Throwable rootCause = Throwables.getRootCause(e);
-            // Don't mark server as failing for client-side issues (bad URLs, validation errors)
+            // Don't mark server as failing for client-side issues (bad URLs, validation
+            // errors)
             // These are link extraction issues, not server issues
             if (rootMessage != null && rootMessage.contains("unknown protocol")) {
               log.debug("skipping unsupported protocol [{}]: {}", href.externalForm, rootMessage);
               destInitial.deleteFile(DeleteOptions.deleteByRenameOption().withIgnoreNonExisting(true));
               return API.Seq();
             }
-            // IllegalArgumentException from RequestResponse validation means bad URL/response
+            // IllegalArgumentException from RequestResponse validation means bad
+            // URL/response
             // (e.g., template variables like ${i.uri}, null status code, etc.)
             if (rootCause instanceof IllegalArgumentException) {
               String location = e.getStackTrace().length > 0 ? e.getStackTrace()[0].getClassName() : "";
-              boolean isWebClientValidation = location.contains("WebClientLocation") || location.contains("RequestResponse");
+              boolean isWebClientValidation = location.contains("WebClientLocation")
+                  || location.contains("RequestResponse");
               log.info("skipping invalid URL/response [{}]: {} ({}{})",
-                href.externalForm,
-                rootMessage != null ? rootMessage : "validation failed",
-                rootCause.getClass().getSimpleName(),
-                isWebClientValidation ? " from WebClient validation" : "");
+                  href.externalForm,
+                  rootMessage != null ? rootMessage : "validation failed",
+                  rootCause.getClass().getSimpleName(),
+                  isWebClientValidation ? " from WebClient validation" : "");
               destInitial.deleteFile(DeleteOptions.deleteByRenameOption().withIgnoreNonExisting(true));
               return API.Seq();
             }
@@ -889,61 +1075,63 @@ public class JCrawler implements Callable<Integer> {
             metaJson.asPathLocation().write(Nodes.json.toString(metadata));
           }
         } finally {
-          log.info("download from url #{} done [{}]", token, href.externalForm);
+          log.debug("download from url #{} done [{}]", token, href.externalForm);
           tokenQueue.put(token);
         }
       } else {
         dest = destFromSymlink.get().asWritableFile();
-        // If symlink points to .gz, we need to strip extension to get "logical" dest? 
+        // If symlink points to .gz, we need to strip extension to get "logical" dest?
         // No, dest is just used for metadata sibling resolution.
         if (dest.extension().equals("gz")) {
-            dest = dest.parentRef().get().child(org.apache.commons.io.FilenameUtils.removeExtension(dest.filename())).asWritableFile();
+          dest = dest.parentRef().get().child(org.apache.commons.io.FilenameUtils.removeExtension(dest.filename()))
+              .asWritableFile();
         }
-        
-        //recompute meta
+
+        // recompute meta
         if (config.migrate) {
           ReferenceLocation metaJson3 = dest.meta("", ".meta.json");
           String metaContent = metaJson3.asReadableFile().readContent();
           Metadata meta = metaContent.isEmpty() ? Metadata.empty(href.externalForm)
               : Nodes.json.toObject(metaContent, Metadata.class);
           WritableFileLocation destRecomputed = config.cached(Slug.contentPathFinal(href.externalForm, meta))
-            .asWritableFile();
+              .asWritableFile();
           var metaJson3Recomputed = destRecomputed.meta("", ".meta.json").asWritableFile();
           if (!isSame(metaJson3, metaJson3Recomputed)) {
             metaJson3.asWritableFile()
-              .rename(metaJson3Recomputed.mkdirOnParentIfNeeded().toPathLocation().backupIfExists());
+                .rename(metaJson3Recomputed.mkdirOnParentIfNeeded().toPathLocation().backupIfExists());
           }
           if (!isSame(dest, destRecomputed)) {
-             // Handle potential compressed rename
-             if (dest.exists()) {
-                 dest.rename(destRecomputed.mkdirOnParentIfNeeded().toPathLocation().backupIfExists());
-             }
-             
-             String encoding = getEncoding(meta);
-             String ext = getExtensionForEncoding(encoding);
-             if (!ext.isEmpty()) {
-                 ReferenceLocation compSrc = dest.parentRef().get().child(dest.filename() + ext);
-                 if (compSrc.exists()) {
-                     ReferenceLocation compDst = destRecomputed.parentRef().get().child(destRecomputed.filename() + ext);
-                     if (!isSame(compSrc, compDst)) {
-                         compSrc.asWritableFile().rename(compDst.asWritableFile().backupIfExists());
-                     }
-                 }
-             }
+            // Handle potential compressed rename
+            if (dest.exists()) {
+              dest.rename(destRecomputed.mkdirOnParentIfNeeded().toPathLocation().backupIfExists());
+            }
+
+            String encoding = getEncoding(meta);
+            String ext = getExtensionForEncoding(encoding);
+            if (!ext.isEmpty()) {
+              ReferenceLocation compSrc = dest.parentRef().get().child(dest.filename() + ext);
+              if (compSrc.exists()) {
+                ReferenceLocation compDst = destRecomputed.parentRef().get().child(destRecomputed.filename() + ext);
+                if (!isSame(compSrc, compDst)) {
+                  compSrc.asWritableFile().rename(compDst.asWritableFile().backupIfExists());
+                }
+              }
+            }
           }
-          
+
           WritableFileLocation finalDest = destRecomputed;
           if (config.contentStorage == ContentStorage.compressed && !destRecomputed.exists()) {
-               String ext = getExtensionForEncoding(getEncoding(meta));
-               if (!ext.isEmpty()) {
-                   WritableFileLocation compDest = destRecomputed.parentRef().get().child(destRecomputed.filename() + ext).asWritableFile();
-                   if (compDest.exists()) {
-                       finalDest = compDest;
-                   }
-               }
+            String ext = getExtensionForEncoding(getEncoding(meta));
+            if (!ext.isEmpty()) {
+              WritableFileLocation compDest = destRecomputed.parentRef().get().child(destRecomputed.filename() + ext)
+                  .asWritableFile();
+              if (compDest.exists()) {
+                finalDest = compDest;
+              }
+            }
           }
           contentUid.userSymlinkTo(finalDest);
-          //links should also be renamed?
+          // links should also be renamed?
 
           dest = destRecomputed;
           metadata = meta;
@@ -966,7 +1154,8 @@ public class JCrawler implements Callable<Integer> {
           }
       } else {
         try {
-          log.debug("download from cache [{}]", href.externalForm);
+          String type = href.isResource ? "RES" : "PAGE";
+          log.info("{}>{} HIT", type, href.externalForm);
           ReferenceLocation metaJson3 = dest.meta("", ".meta.json");
           String metaContent = metaJson3.asReadableFile().readContent();
           Metadata meta = metaContent.isEmpty() ? new Metadata() : Nodes.json.toObject(metaContent, Metadata.class);
@@ -975,94 +1164,101 @@ public class JCrawler implements Callable<Integer> {
           log.debug("download from cache done [{}]", href.externalForm);
         }
       }
-      //Locations.url(link)
-      //        .copyToFileAndReturnIt(dest,
-      //          CopyOptions
-      //            .copyDoNotOverwriteButIgnore()
-      //            .withCopyMeta(true)
-      //            .withDefaultReporting())
+      // Locations.url(link)
+      // .copyToFileAndReturnIt(dest,
+      // CopyOptions
+      // .copyDoNotOverwriteButIgnore()
+      // .withCopyMeta(true)
+      // .withDefaultReporting())
       return links
-        //Filter out self reference when traversing
-        .filter(x -> !x.externalForm.equals(href.externalForm))
-        .iterator()
-        .groupBy(x -> x.externalForm)
-        .map(x -> x._2.head())
-        .filter(x -> accept(x))
-      //return distinct externalForm - first
-      //.map(x -> x._2.head())
+          // Filter out self reference when traversing
+          .filter(x -> !x.externalForm.equals(href.externalForm))
+          .iterator()
+          .groupBy(x -> x.externalForm)
+          .map(x -> x._2.head())
+          .filter(x -> accept(x))
+      // return distinct externalForm - first
+      // .map(x -> x._2.head())
       ;
-      //      } catch (Exception e) {
-      //        Throwable root = Throwables.getRootCause(e);
-      //        if (root != null) {
-      //          if (root instanceof SocketException e3 && e3.getMessage().equals("Connection reset")) {
-      //            throw e;
-      //          }
-      //        }
-      //        //TODO write in meta the error?
-      //        log.error("Couldn't extract links from {} - {}", dest.absoluteAndNormalized(), href.externalForm, e);
-      //        return io.vavr.collection.Iterator.empty();
-      //      }
+      // } catch (Exception e) {
+      // Throwable root = Throwables.getRootCause(e);
+      // if (root != null) {
+      // if (root instanceof SocketException e3 && e3.getMessage().equals("Connection
+      // reset")) {
+      // throw e;
+      // }
+      // }
+      // //TODO write in meta the error?
+      // log.error("Couldn't extract links from {} - {}",
+      // dest.absoluteAndNormalized(), href.externalForm, e);
+      // return io.vavr.collection.Iterator.empty();
+      // }
     }
     //
-    //    public RequestResponse download(String url) {
-    //      //return downloadAndExtractLinks(url);
-    //      throw new RuntimeException("Not implemented yet!!!");
-    //    }
+    // public RequestResponse download(String url) {
+    // //return downloadAndExtractLinks(url);
+    // throw new RuntimeException("Not implemented yet!!!");
+    // }
 
-    public RequestResponse download(String url, WritableFileLocation dest) {
+    public RequestResponse download(HyperLink href, WritableFileLocation dest) {
+      String url = href.externalForm;
       HttpClient client2 = HttpClient.newHttpClient();
       Builder reqBuilder = HttpRequest.newBuilder(URI.create(url));
-      //GET /corp/xweb/xweb.asp?NTKN=c&page=jobmatches&txtJobId=J1024-0659&clid=21001&jid=1419639 HTTP/1.1
+      // GET
+      // /corp/xweb/xweb.asp?NTKN=c&page=jobmatches&txtJobId=J1024-0659&clid=21001&jid=1419639
+      // HTTP/1.1
       java.util.List<String> headers = headers(
-        """
-              Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
-              Accept-Encoding: gzip, deflate, br, zstd, identity
-              Accept-Language: en-US,en;q=0.9,ro;q=0.8,hu;q=0.7
-              Referer: https://cgi.njoyn.com/
-              Upgrade-Insecure-Requests: 1
-              User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36
-              Cache-Control: no-cache
-              Pragma: no-cache
-              Sec-Fetch-Dest: document
-              Sec-Fetch-Mode: navigate
-              Sec-Fetch-Site: none
-              Sec-Fetch-User: ?1
-              sec-ch-ua: "Chromium";v="130", "Google Chrome";v="130", "Not?A_Brand";v="99"
-              sec-ch-ua-mobile: ?0
-              sec-ch-ua-platform: "Windows"
-            """,
-        "Cookie", "Referer", "Connection", "Host");
+          """
+                Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7
+                Accept-Encoding: gzip, deflate, br, zstd, identity
+                Accept-Language: en-US,en;q=0.9,ro;q=0.8,hu;q=0.7
+                Referer: https://cgi.njoyn.com/
+                Upgrade-Insecure-Requests: 1
+                User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36
+                Cache-Control: no-cache
+                Pragma: no-cache
+                Sec-Fetch-Dest: document
+                Sec-Fetch-Mode: navigate
+                Sec-Fetch-Site: none
+                Sec-Fetch-User: ?1
+                sec-ch-ua: "Chromium";v="130", "Google Chrome";v="130", "Not?A_Brand";v="99"
+                sec-ch-ua-mobile: ?0
+                sec-ch-ua-platform: "Windows"
+              """,
+          "Cookie", "Referer", "Connection", "Host");
       reqBuilder.headers(headers.toArray(new String[0]));
       HttpRequest request = reqBuilder
-        .build();
+          .build();
       try {
-                HttpResponse<Path> response = client2.send(request,
-                  HttpResponse.BodyHandlers.ofFile(dest.asPathLocation().toPath()));
-                
-                String encoding = response.headers().firstValue("Content-Encoding").orElse("");
-                String extension = getExtensionForEncoding(encoding);
-                if (!extension.isEmpty()) {
-                   Path path = dest.asPathLocation().toPath();
-                   Path tempPath = path.resolveSibling(path.getFileName() + extension);
-                   // Move original to .<ext>
-                   java.nio.file.Files.move(path, tempPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-        
-                   if (config.contentStorage == ContentStorage.decompressed || config.contentStorage == ContentStorage.both) {
-                       try (InputStream raw = java.nio.file.Files.newInputStream(tempPath);
-                            InputStream is = decompressStream(encoding, raw);
-                            java.io.OutputStream fos = java.nio.file.Files.newOutputStream(path)) {
-                            is.transferTo(fos);
-                       }
-                   }
-                   if (config.contentStorage == ContentStorage.decompressed) {
-                       java.nio.file.Files.delete(tempPath);
-                   }
-                }
-        
-                // Access request and response details        //        HttpRequest sentRequest = response.request();
+        HttpResponse<Path> response = client2.send(request,
+            HttpResponse.BodyHandlers.ofFile(dest.asPathLocation().toPath()));
+
+        String encoding = response.headers().firstValue("Content-Encoding").orElse("");
+        String extension = getExtensionForEncoding(encoding);
+        if (!extension.isEmpty()) {
+          Path path = dest.asPathLocation().toPath();
+          Path tempPath = path.resolveSibling(path.getFileName() + extension);
+          // Move original to .<ext>
+          java.nio.file.Files.move(path, tempPath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+
+          if (config.contentStorage == ContentStorage.decompressed || config.contentStorage == ContentStorage.both) {
+            try (InputStream raw = java.nio.file.Files.newInputStream(tempPath);
+                InputStream is = decompressStream(encoding, raw);
+                java.io.OutputStream fos = java.nio.file.Files.newOutputStream(path)) {
+              is.transferTo(fos);
+            }
+          }
+          if (config.contentStorage == ContentStorage.decompressed) {
+            java.nio.file.Files.delete(tempPath);
+          }
+        }
+
+        // Access request and response details // HttpRequest sentRequest =
+        // response.request();
         int statusCode = response.statusCode();
-        log.debug("downloading #{}: {} to {}", statusCode, url, dest.toExternalForm());
-        //return client.get(url).copyTo(dest);
+        String type = href.isResource ? "RES" : "PAGE";
+        log.info("{}>{} MIS", type, url);
+        // return client.get(url).copyTo(dest);
         return new RequestResponse(client.get(url), response);
       } catch (IOException | InterruptedException e) {
         throw org.jedio.RichThrowable.nowrap(e);
@@ -1090,12 +1286,14 @@ public class JCrawler implements Callable<Integer> {
           continue;
         }
 
-        // Handle splitting by commas only for headers that do not require a single value
+        // Handle splitting by commas only for headers that do not require a single
+        // value
         if (key.equalsIgnoreCase("User-Agent") || key.equalsIgnoreCase("Referer") || key.equalsIgnoreCase("Cookie")) {
           headerList.add(key);
           headerList.add(value);
         } else {
-          // Use Guava's Splitter to split values on commas and add each as a separate key-value pair
+          // Use Guava's Splitter to split values on commas and add each as a separate
+          // key-value pair
           Iterable<String> values = Splitter.on(",").omitEmptyStrings().trimResults().split(value);
           for (String v : values) {
             headerList.add(key);
@@ -1107,9 +1305,10 @@ public class JCrawler implements Callable<Integer> {
       return headerList;
     }
 
-    //val notParsedUrls = Seq("javascript", "tel")
-    //Extract links from content taking into consideration the base url but also the possible <base> tag attribute.
-    //<base href="http://www.cartierbratieni.ro/" />
+    // val notParsedUrls = Seq("javascript", "tel")
+    // Extract links from content taking into consideration the base url but also
+    // the possible <base> tag attribute.
+    // <base href="http://www.cartierbratieni.ro/" />
     @SneakyThrows
     private Traversable<HyperLink> extractLinksInMemory(HyperLink parent, WritableFileLocation source,
         Metadata meta) {
@@ -1121,8 +1320,8 @@ public class JCrawler implements Callable<Integer> {
       if (metaLinks.exists() && !config.recomputeLinks) {
         try {
           io.vavr.collection.Iterator<@NonNull HyperLink> all = nodes.toIterator(
-            metaLinks.asReadableFile().readContent(),
-            HyperLink.class);
+              metaLinks.asReadableFile().readContent(),
+              HyperLink.class);
           HyperLink firstElement = all.headOption().getOrNull();
 
           // Rebuild the iterator with the first element not consumed
@@ -1132,52 +1331,61 @@ public class JCrawler implements Callable<Integer> {
           return newIterator;
         } catch (com.fasterxml.jackson.databind.RuntimeJsonMappingException e) {
           log.info(
-            "Ignoring links cache from {} and read links again for a parsing error. Enable trace for full details:{}",
-            metaLinks, e.getMessage());
+              "Ignoring links cache from {} and read links again for a parsing error. Enable trace for full details:{}",
+              metaLinks, e.getMessage());
           log.trace("Ignoring links cache from {} and read links again for a parsing error.", metaLinks, e);
         }
       }
       String content = "";
       if (source.exists()) {
-          content = source.asReadableFile().readContent();
+        content = source.asReadableFile().readContent();
       } else {
-          String encoding = meta.responseHeaders.getFirst("Content-Encoding");
-          String ext = getExtensionForEncoding(encoding);
-          if (!ext.isEmpty()) {
-              ReferenceLocation compressedSource = source.parentRef().get().child(source.filename() + ext);
-              if (compressedSource.exists()) {
-                  try (InputStream is = decompressStream(encoding, compressedSource.asReadableFile().unsafeInputStream())) {
-                      content = new String(is.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
-                  }
-              }
+        String encoding = meta.responseHeaders.getFirst("Content-Encoding");
+        String ext = getExtensionForEncoding(encoding);
+        if (!ext.isEmpty()) {
+          ReferenceLocation compressedSource = source.parentRef().get().child(source.filename() + ext);
+          if (compressedSource.exists()) {
+            try (InputStream is = decompressStream(encoding, compressedSource.asReadableFile().unsafeInputStream())) {
+              content = new String(is.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+            }
           }
+        }
       }
-      //Option<String> contentType = meta.responseHeaders.getContentType()==MediaType.TEXT_HTML;
+      // Option<String> contentType =
+      // meta.responseHeaders.getContentType()==MediaType.TEXT_HTML;
       MediaType contentType = meta.responseHeaders.getContentType();
       boolean isHtmlAnd200 = meta.statusCodeValue == 200 && contentType != null
           && (contentType.getType().equals(MediaType.TEXT_HTML.getType())
               ||
               contentType.getSubtype().equals(MediaType.APPLICATION_XML.getSubtype()));
-      log.info("searching links in [{}] from {}", contentType, source);
+      log.debug("searching links in [{}] from {}", contentType, source);
       String sourceUrl = meta.url;
-      //String sourceUrl = meta2.httpMetaRequestUri().get();
+      // String sourceUrl = meta2.httpMetaRequestUri().get();
       io.vavr.collection.Iterator<HyperLink> result = isHtmlAnd200
           ? extractLinksFromContent(parent.depth + 1, content, source.toExternalForm(), sourceUrl)
           : io.vavr.collection.Iterator.empty();
       List<HyperLink> all = result.toList();
       int status = meta.statusCodeValue;
       if (300 <= status && status < 400 && meta.responseHeaders.getLocation() != null) {
-        //String sourceUrl = meta2.httpMetaRequestUri().get();
+        // String sourceUrl = meta2.httpMetaRequestUri().get();
         String url = meta.responseHeaders.getLocation().toString();
+        boolean isResource = false;
+        if (url != null) {
+          String lower = url.toLowerCase();
+          if (lower.endsWith(".pdf") || lower.endsWith(".zip") || lower.endsWith(".mp3") || lower.endsWith(".avi")
+              || lower.endsWith(".jpg") || lower.endsWith(".png") || lower.endsWith(".css") || lower.endsWith(".js")) {
+            isResource = true;
+          }
+        }
         all = all
-          .append(
-            HyperLink.of(url, parent.depth + 1, "Moved - http status " + status, null, "", sourceUrl,
-              source.toExternalForm(), true));
+            .append(
+                HyperLink.of(url, parent.depth + 1, "Moved - http status " + status, null, "", sourceUrl,
+                    source.toExternalForm(), true, isResource));
       }
-      //      YAMLMapper mapper = Nodes.yml.mapper();
-      //      mapper.configure(YAMLGenerator.Feature.LITERAL_BLOCK_STYLE, true);
-      //      mapper.configure(YAMLGenerator.Feature.MINIMIZE_QUOTES, true);
-      //      mapper.configure(YAMLGenerator.Feature.WRITE_DOC_START_MARKER, false);
+      // YAMLMapper mapper = Nodes.yml.mapper();
+      // mapper.configure(YAMLGenerator.Feature.LITERAL_BLOCK_STYLE, true);
+      // mapper.configure(YAMLGenerator.Feature.MINIMIZE_QUOTES, true);
+      // mapper.configure(YAMLGenerator.Feature.WRITE_DOC_START_MARKER, false);
       String c = nodes.toString(all);
       metaLinks.asWritableFile().write(c);
       return all;

@@ -4,13 +4,17 @@ import java.io.PrintWriter;
 
 import org.junit.platform.console.options.CommandResult;
 
+//DEPS ch.qos.logback:logback-classic:1.4.11
+//DEPS ch.qos.logback:logback-core:1.4.11
 //DEPS org.junit.jupiter:junit-jupiter:5.11.3
 //DEPS org.assertj:assertj-core:3.26.3
 //DEPS org.junit.jupiter:junit-jupiter-engine:5.11.3
 //DEPS org.junit.platform:junit-platform-launcher:1.11.3
 //DEPS org.junit.platform:junit-platform-console:1.11.3
+//DEPS org.junit.platform:junit-platform-commons:1.11.3
+//DEPS org.junit.platform:junit-platform-engine:1.11.3
 
-//SOURCES RichCli.java
+//SOURCES ../../../../../main/java/com/namekis/utils/RichCli.java
 
 public class RichTestCli {
   public static void main(String[] allArgs) {
@@ -37,7 +41,8 @@ public class RichTestCli {
   }
 
   /**
-   * Resolve the calling test class from the stack and run only that test class (including nested tests).
+   * Resolve the calling test class from the stack and run only that test class
+   * (including nested tests).
    */
   public static void main2(String[] allArgs) {
     String testClassName = detectTestClassNameFromStacktrace();
@@ -45,7 +50,8 @@ public class RichTestCli {
   }
 
   /**
-   * Run JUnit with classpath scanning scoped to the given test class (including nested tests).
+   * Run JUnit with classpath scanning scoped to the given test class (including
+   * nested tests).
    */
   public static void main2(String[] allArgs, String testClassName) {
     com.namekis.utils.RichCli.main(allArgs, args -> {
